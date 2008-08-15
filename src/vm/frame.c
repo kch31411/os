@@ -22,6 +22,7 @@ void
 frame_init (void)
 {
   hash_init (&frames, frame_hash, frame_less, NULL);
+  list_init (&frame_list);
   lock_init (&frame_lock);
   isFirst = true;
 }
@@ -60,6 +61,7 @@ frame_create (void* phy_addr, void* page_addr)
     list_push_back (&fr->refer_pages, &pp->elem);
 
     hash_insert (&frames, &fr->elem);
+    list_push_back (&frame_list, &fr->list_elem);
   }
 }
 
@@ -122,8 +124,8 @@ frame_delete (void *phy_addr, bool isForce)
   
   if (isForce == true || list_size (l) == 0) 
   {
-
     hash_delete (&frames, eh);
+    list_remove (&fr->list_elem);
     free (fr);
   }
   lock_release (&frame_lock);
@@ -163,16 +165,44 @@ frame_victim ()
 {
   struct hash_elem *e;
 
-/*  hash_first (&frame_iter, &frames);
+  /*
+  hash_first (&frame_iter, &frames);
   e = hash_next (&frame_iter);
-  return hash_entry (e, struct frame, elem); */
+  struct frame *f = hash_entry (e, struct frame, elem);
+    printf ("victim: %x\n", f->phy_addr);
+  return f;
+  
 
   if (isFirst == true) 
   {
     hash_first (&frame_iter, &frames);
     isFirst = false;
   }
- 
+
+  e = hash_next (&frame_iter);
+  if (e == NULL) 
+  {
+      hash_first (&frame_iter, &frames);
+      e = hash_next (&frame_iter);
+  }
+  return hash_entry (e, struct frame, elem);
+  */
+
+  while (1)
+  {
+    struct list_elem *e = list_pop_front (&frame_list);
+    struct frame *f = list_entry (e, struct frame, list_elem);
+
+    list_push_back (&frame_list, e);
+
+    if (frame_is_accessed (f) == false)
+    {
+       return f;
+    }
+
+    else frame_reset_accessed (f);
+  }
+/*
   while (1)
   {
     e = hash_next (&frame_iter);
@@ -182,9 +212,7 @@ frame_victim ()
       continue;
     }
 
-//    printf ("elem : %x\n", e);
     struct frame *f = hash_entry (e, struct frame, elem);
-//    printf ("frame : %x\n", f);
 
     if (frame_is_accessed (f) == false) 
     {
@@ -197,5 +225,5 @@ frame_victim ()
       return f;
     }
     else frame_reset_accessed (f);
-  }
+  } */
 }

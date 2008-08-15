@@ -165,14 +165,14 @@ page_fault (struct intr_frame *f)
 
   if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)// || is_user_vaddr (f->esp) == false)
   {
- //   printf ("case1\n");
-  //  printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
+//    printf ("case1\n");
+ //   printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
     syscall_exit (-1);
   }
 
   if (p != NULL && p->isDisk == true) // in disk
   {
-  //  printf ("case2\n");
+//   printf ("case2\n");
     uint8_t *kpage;
     bool success = false;
 
@@ -194,7 +194,7 @@ page_fault (struct intr_frame *f)
 
   else if (p == NULL && (f->esp < fault_addr || ABS(f->esp - fault_addr) <= 32) && fault_addr > PHYS_BASE - 0x800000)
   {
-  //  printf ("case3\n");
+ //   printf ("case3\n");
 
     uint8_t *kpage;
     bool success = false;
@@ -212,7 +212,7 @@ page_fault (struct intr_frame *f)
 
   else
   {
- //   printf ("case4\n");
+ //      printf ("case4\n");
  //   printf ("FOR DEBUG : page fault , will exit(-1)");
     syscall_exit (-1);
 //    thread_exit ();

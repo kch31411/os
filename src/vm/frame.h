@@ -17,10 +17,13 @@ struct frame
   struct list refer_pages;
   
   struct hash_elem elem;
+  struct list_elem list_elem;
   //struct lock lock;
 };
 
 struct hash frames;
+struct list frame_list;
+
 struct lock frame_lock;
 static struct hash_iterator frame_iter;
 bool isFirst;
