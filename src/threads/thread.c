@@ -356,11 +356,13 @@ thread_exit (void)
     printf ("frame %x\n", p->phy_addr);
   }
   */
-  int tmp[ hash_size (&cur->pages) ];
+  int tmp[hash_size (&cur->pages)];
   int tmp_idx = 0;
  
   hash_first (&it, &cur->pages);
   hash_next (&it);
+
+  lock_acquire (&swap_lock);
   while (hash_cur (&it) != NULL)
   {
     struct page *p = hash_entry (hash_cur (&it), struct page, elem);
@@ -383,6 +385,7 @@ thread_exit (void)
   {
     page_delete (tmp[i]);
   }
+  lock_release (&swap_lock);
 
   hash_destroy(&cur->pages, NULL);
 

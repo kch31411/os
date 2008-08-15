@@ -104,16 +104,23 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   
   else 
   {
+    lock_acquire (&frame_lock);
     struct frame *f = frame_victim ();
     int i;
 
+  //  printf("swap out : pid->%d f-> %x, addr ->%x\n", thread_current()->tid, f, f->phy_addr);
+    pages = f->phy_addr;
     for (i = 0; i < page_cnt; i++)
     {
-      disk_sector_t disk_no = swap_out (f->phy_addr + PGSIZE * i);
+      struct frame *now = frame_find (f->phy_addr + PGSIZE * i);
       
-      struct list l = f->refer_pages;
+   //   printf("Before swap_out : pid->%d, addr-> %x\n", thread_current()->tid, now->phy_addr);
+      disk_sector_t disk_no = swap_out (now->phy_addr);
+      
+      struct list *l = &f->refer_pages;
       struct list_elem *e;
-      for (e = list_begin (&l); e != list_end (&l); e = list_next (e))
+
+      for (e = list_begin (l); e != list_end (l); e = list_next (e))
       {
         struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
 
@@ -121,15 +128,13 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
         // TODO : swap should track all the pages indicating the disk slot
 
         struct page *p = page_lookup (pp->thread, pp->addr);
-        
         p->disk_no = disk_no;
         p->isDisk = true;
       }
 
+      lock_release (&frame_lock);
       frame_delete (f->phy_addr + PGSIZE * i, true);
     }
-
-    pages = f->phy_addr;
   }
 
   return pages;

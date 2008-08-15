@@ -158,18 +158,27 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
 
   struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
-  struct page *stack_page = page_lookup (thread_current (), pg_round_down (f->esp));
+//  struct page *stack_page = page_lookup (thread_current (), pg_round_down (f->esp));
 
-//  printf ("isuser: %d, ADDR: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, page_lookup (thread_current (), pg_round_up (fault_addr)));
+//  printf ("EIP:%x\n", f->eip);
+//  printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
+
+  if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)// || is_user_vaddr (f->esp) == false)
+  {
+ //   printf ("case1\n");
+  //  printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
+    syscall_exit (-1);
+  }
 
   if (p != NULL && p->isDisk == true) // in disk
-  { 
+  {
+  //  printf ("case2\n");
     uint8_t *kpage;
     bool success = false;
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-    if (kpage != NULL) 
-    {
+    if (kpage != NULL)
+    { 
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true);
     } 
     ASSERT (success == true);
@@ -183,11 +192,10 @@ page_fault (struct intr_frame *f)
     return;
   }
 
-  /*
-  else if (is_user_vaddr (fault_addr) // stack growth
-      && p == NULL)  */
-  else if (is_user_vaddr (fault_addr) && ( stack_page==NULL || ABS(f->esp - fault_addr) < 32 ))
+  else if (p == NULL && (f->esp < fault_addr || ABS(f->esp - fault_addr) <= 32) && fault_addr > PHYS_BASE - 0x800000)
   {
+  //  printf ("case3\n");
+
     uint8_t *kpage;
     bool success = false;
 
@@ -204,7 +212,10 @@ page_fault (struct intr_frame *f)
 
   else
   {
-    syscall_exit(-1);
+ //   printf ("case4\n");
+ //   printf ("FOR DEBUG : page fault , will exit(-1)");
+    syscall_exit (-1);
+//    thread_exit ();
   }
 
   printf ("Page fault at %p: %s error %s page in %s context.\n",

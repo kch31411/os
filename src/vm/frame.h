@@ -1,6 +1,7 @@
 #include <hash.h>
 #include <list.h>
 #include <debug.h>
+#include "threads/synch.h"
 
 struct page_pointer
 {
@@ -16,10 +17,13 @@ struct frame
   struct list refer_pages;
   
   struct hash_elem elem;
+  //struct lock lock;
 };
 
 struct hash frames;
+struct lock frame_lock;
 static struct hash_iterator frame_iter;
+bool isFirst;
 
 unsigned frame_hash (const struct hash_elem *f_, void *aux UNUSED);
 bool frame_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);

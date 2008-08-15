@@ -46,7 +46,8 @@ int arg_get (int *p)
   
   else 
   {
-    return -1;
+    syscall_exit (-1);
+    return -1;  
   }
 }
 

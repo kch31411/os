@@ -13,9 +13,7 @@ bool
 frame_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED)
 {
   const struct frame *a = hash_entry (a_, struct frame, elem);
-//  printf ("A %x\n", a->phy_addr);
   const struct frame *b = hash_entry (b_, struct frame, elem);
-//  printf ("B %x\n", b->phy_addr);
 
   return (a->phy_addr < b->phy_addr);
 }
@@ -24,7 +22,8 @@ void
 frame_init (void)
 {
   hash_init (&frames, frame_hash, frame_less, NULL);
-  hash_first (&frame_iter, &frames);
+  lock_init (&frame_lock);
+  isFirst = true;
 }
 
 void 
@@ -42,7 +41,11 @@ frame_create (void* phy_addr, void* page_addr)
 
   if (e = hash_find (&frames, &f.elem) != NULL)
   {
+    printf ("phy add:%x, vir addr:%x\n", phy_addr, page_addr);
+
+//    ASSERT (false);
     struct frame *fr = hash_entry (e, struct frame, elem);
+
     list_push_back (&fr->refer_pages, &pp->elem);
   }
 
@@ -51,9 +54,11 @@ frame_create (void* phy_addr, void* page_addr)
     struct frame *fr = malloc (sizeof (struct frame));
   
     fr->phy_addr = phy_addr;
+
     list_init (&fr->refer_pages);
+    //lock_init (&fr->lock);
     list_push_back (&fr->refer_pages, &pp->elem);
-    
+
     hash_insert (&frames, &fr->elem);
   }
 }
@@ -64,6 +69,7 @@ frame_find (void *phy_addr)
   struct frame f;
   struct hash_elem *e;
 
+    
   f.phy_addr = phy_addr;
   e = hash_find (&frames, &f.elem);
   return e != NULL ? hash_entry (e, struct frame, elem) : NULL;
@@ -72,6 +78,8 @@ frame_find (void *phy_addr)
 void 
 frame_delete (void *phy_addr, bool isForce)
 {
+  lock_acquire (&frame_lock);
+  
   struct frame f;
   struct frame *fr;
   struct hash_elem *eh;
@@ -81,33 +89,44 @@ frame_delete (void *phy_addr, bool isForce)
   f.phy_addr = phy_addr;
 
   eh = hash_find (&frames, &f.elem);
-
   ASSERT (eh != NULL);
+
   fr = hash_entry (eh, struct frame, elem);
-
   l = &fr->refer_pages;
-  for (el = list_begin (l); el != list_end (l); el = list_next (l))
+  
+  if (isForce == true)
   {
-    struct page_pointer *pp = list_entry (el, struct page_pointer, elem);
-
-    if (isForce == true)
+    while (list_empty (l) == false)
     {
+      struct page_pointer *pp = list_entry (list_pop_front (l), struct page_pointer, elem);
       free (pp);
-    }
-
-    else if (pp->thread == thread_current ()) 
-    {
-      list_remove (el);
-      free (pp);
-      break;
     }
   }
 
+  else
+  { 
+    for (el = list_begin (l); el != list_end (l); el = list_next (l))
+    {
+      struct page_pointer *pp = list_entry (el, struct page_pointer, elem);
+
+      if (pp->thread == thread_current ()) 
+      {
+        list_remove (el);
+
+        free (pp);
+        break;
+      }
+    }
+  }
+
+  
   if (isForce == true || list_size (l) == 0) 
   {
+
     hash_delete (&frames, eh);
     free (fr);
   }
+  lock_release (&frame_lock);
 }
 
 bool
@@ -119,7 +138,7 @@ frame_is_accessed (struct frame *f)
   for (e = list_begin (&f->refer_pages); e != list_end (&f->refer_pages); e = list_next (e))
   {
     struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
-
+    ASSERT (pp != NULL);
     ret |= pagedir_is_accessed (pp->thread->pagedir, pp->addr);
   }
 
@@ -144,17 +163,39 @@ frame_victim ()
 {
   struct hash_elem *e;
 
-  while (e = hash_next (&frame_iter))
+/*  hash_first (&frame_iter, &frames);
+  e = hash_next (&frame_iter);
+  return hash_entry (e, struct frame, elem); */
+
+  if (isFirst == true) 
   {
+    hash_first (&frame_iter, &frames);
+    isFirst = false;
+  }
+ 
+  while (1)
+  {
+    e = hash_next (&frame_iter);
     if (e == NULL) 
     {
       hash_first (&frame_iter, &frames);
       continue;
     }
 
+//    printf ("elem : %x\n", e);
     struct frame *f = hash_entry (e, struct frame, elem);
+//    printf ("frame : %x\n", f);
 
-    if (frame_is_accessed (f) == false) return f;
+    if (frame_is_accessed (f) == false) 
+    {
+      if (hash_next (&frame_iter) == NULL)
+      {
+        hash_first (&frame_iter, &frames);
+      }
+
+//      printf ("will return %x\n", f);
+      return f;
+    }
     else frame_reset_accessed (f);
-  } 
+  }
 }

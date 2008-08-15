@@ -10,6 +10,7 @@
 
 struct bitmap *swap_slot;
 struct lock swap_lock;
+struct lock swap_bitmap_lock;
 struct disk *swap_disk;
 
 void swap_init (void);

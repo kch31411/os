@@ -34,6 +34,10 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+#include "vm/page.h"
+#include "vm/swap.h"
+#include "vm/frame.h"
+
 
 /* Amount of physical memory, in 4 kB pages. */
 size_t ram_pages;
@@ -75,7 +79,7 @@ main (void)
   argv = read_command_line ();
   argv = parse_options (argv);
    
-  palloc_init ();
+//  palloc_init ();
   
   /* Initialize ourselves as a thread so we can use locks,
      then enable console locking. */
@@ -86,7 +90,7 @@ main (void)
   printf ("Pintos booting with %'zu kB RAM...\n", ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
-//  palloc_init ();
+  palloc_init ();
   malloc_init ();
   paging_init ();
 
