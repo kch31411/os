@@ -18,6 +18,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#define MAX_ARGS 128
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -215,14 +217,33 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+
+  int argc;
+  char *argv[MAX_ARGS];
+  char *save_ptr;
+  char *fn_copy;
+
+  int len;
+  char *ptr;
+
+  fn_copy = palloc_get_page (0);
+  if (fn_copy == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
 
+  // Tokenizing
+  argc = 0;
+  for (argv[argc] = strtok_r (fn_copy, " ", &save_ptr); argv[argc] != NULL; argv[++argc] = strtok_r (NULL, " ", &save_ptr));
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (argv[0]);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -304,6 +325,53 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
+
+
+  /* Argument Passing */
+  for (i = argc - 1; i >= 0; i--)
+  {
+    len = strlen(argv[i]) + 1;
+    *esp -= len;
+    strlcpy(*esp, argv[i], len);
+  }
+
+  // word-align
+  int tmp = (unsigned)(*esp) % 4;
+//  printf("%u %d %u %d\n", (unsigned)(*esp), (int)(*esp), PHYS_BASE, tmp);
+  memset ((*esp) - tmp, 0, tmp);
+  *esp -= tmp;
+
+  // the last argv (zero-word)
+  *esp -= 4;
+  memset (*esp, 0, 4);
+
+  // argv[]
+  ptr = PHYS_BASE;
+  for (i = argc - 1; i >= 0; i--)
+  {
+    *esp -= 4;
+    ptr -= strlen(argv[i]) + 1;
+    *((char**)*esp) = ptr;
+  }
+
+  // argv
+  *esp -= 4;
+  *((char**)*esp) = *esp + 4;
+
+  // argc
+  *esp -= 4;
+  *(int*)(*esp) = argc;
+
+  // ret address
+  *esp -= 4;
+  memset (*esp, 0, 4);
+
+/*  printf("HEXDUMP\n\n");
+  printf("current esp : %x\n", (unsigned)*esp);
+  printf("end of user memory : %x\n", PHYS_BASE); 
+  hex_dump ((unsigned)*esp, *esp, PHYS_BASE - (unsigned)*esp, true); */
+
+
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
