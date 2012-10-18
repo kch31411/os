@@ -31,6 +31,7 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *save_ptr;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -40,10 +41,20 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  // Tokenizing
+  strtok_r(file_name, " ", &save_ptr);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  // stop
+  sema_down (&thread_current ()->create_sema);
+  
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+  {
+    palloc_free_page (fn_copy);
+  } 
+
   return tid;
 }
 
@@ -52,6 +63,8 @@ process_execute (const char *file_name)
 static void
 start_process (void *f_name)
 {
+//  printf("start process\n\n\n\n");
+
   char *file_name = f_name;
   struct intr_frame if_;
   bool success;
@@ -61,10 +74,14 @@ start_process (void *f_name)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+
+  sema_up (&thread_current ()->parent->create_sema);
+
   if (!success) 
     thread_exit ();
 
@@ -90,6 +107,34 @@ start_process (void *f_name)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  struct thread *t = thread_current ();
+  struct list_elem *i;
+  int ret;
+
+  for (i = list_begin (&t->child_list); i != list_end (&t->child_list); i = list_next (i))
+  {
+    struct thread *e = list_entry (i, struct thread, child_elem);
+
+    if (e->tid == child_tid)
+    {
+      sema_down (&e->end_sema);
+      break;
+    }
+  }
+
+  for (i = list_begin (&t->dead_list); i != list_end (&t->dead_list); i = list_next (i))
+  {
+    struct dead_child *e = list_entry (i, struct dead_child, child_elem);
+
+    if (e->tid == child_tid)
+    {
+      ret = e->exit_status;
+      list_remove (&e->child_elem);
+      palloc_free_page (e);
+      return ret;
+    }
+  }
+
   return -1;
 }
 
@@ -217,7 +262,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
-
   int argc;
   char *argv[MAX_ARGS];
   char *save_ptr;
@@ -225,12 +269,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   int len;
   char *ptr;
-
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
-
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -240,10 +278,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   // Tokenizing
   argc = 0;
-  for (argv[argc] = strtok_r (fn_copy, " ", &save_ptr); argv[argc] != NULL; argv[++argc] = strtok_r (NULL, " ", &save_ptr));
+  for (argv[argc] = strtok_r (file_name, " ", &save_ptr); argv[argc] != NULL; argv[++argc] = strtok_r (NULL, " ", &save_ptr));
 
   /* Open executable file. */
-  file = filesys_open (argv[0]);
+  file = filesys_open (file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -326,7 +364,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (!setup_stack (esp))
     goto done;
 
-
   /* Argument Passing */
   for (i = argc - 1; i >= 0; i--)
   {
@@ -337,7 +374,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   // word-align
   int tmp = (unsigned)(*esp) % 4;
-//  printf("%u %d %u %d\n", (unsigned)(*esp), (int)(*esp), PHYS_BASE, tmp);
   memset ((*esp) - tmp, 0, tmp);
   *esp -= tmp;
 
@@ -365,13 +401,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   // ret address
   *esp -= 4;
   memset (*esp, 0, 4);
-
-/*  printf("HEXDUMP\n\n");
-  printf("current esp : %x\n", (unsigned)*esp);
-  printf("end of user memory : %x\n", PHYS_BASE); 
-  hex_dump ((unsigned)*esp, *esp, PHYS_BASE - (unsigned)*esp, true); */
-
-
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;

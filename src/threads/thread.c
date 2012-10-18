@@ -196,6 +196,10 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
 
+  /* Thread construction complete */
+  list_push_back (&thread_current ()->child_list, &t->child_elem);
+  t->parent = thread_current ();
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -283,6 +287,23 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
+
+  struct thread *cur = thread_current ();
+  struct dead_child *dc;
+
+  dc = palloc_get_page (0);
+  dc->tid = cur->tid;
+  dc->exit_status = cur->exit_status;
+  
+  list_remove(&cur->child_elem);
+  if (cur->parent != NULL)
+  {
+    list_push_back(&cur->parent->dead_list, &dc->child_elem);
+  }
+
+  sema_up (&cur->end_sema);
+  
+  // TODO: memory release
 
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
@@ -440,6 +461,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+  t->parent = NULL;
+  list_init(&t->child_list);
+  list_init(&t->dead_list);
+  t->exit_status = -1;
+  sema_init(&t->create_sema, 0);
+  sema_init(&t->end_sema, 0);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
