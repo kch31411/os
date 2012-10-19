@@ -6,9 +6,6 @@
 #include <stdint.h>
 #include "synch.h"
 
-#include "filesys/file.h"
-//#include "filesys/file.c"
-
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -118,16 +115,12 @@ struct thread
     struct semaphore end_sema;
 
     bool create_success;
+    struct file *execute_file;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
 
-struct asdf
-{
-    struct file *file;
-    bool read_only;
-};
 
 struct dead_child
 {

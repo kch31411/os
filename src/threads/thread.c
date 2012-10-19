@@ -301,6 +301,12 @@ thread_exit (void)
     list_push_back(&cur->parent->dead_list, &dc->child_elem);
   }
 
+  if (cur->execute_file != NULL) 
+  {
+    file_allow_write (cur->execute_file);
+  }
+  file_close (cur->execute_file);
+
   sema_up (&cur->end_sema);
   
   // TODO: memory release

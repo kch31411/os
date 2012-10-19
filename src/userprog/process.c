@@ -88,7 +88,10 @@ start_process (void *f_name)
 
 //  printf ("will load\n");
   success = load (file_name, &if_.eip, &if_.esp);
-  if (success == true) thread_current ()->parent->create_success = true;
+  if (success == true)
+  {
+    thread_current ()->parent->create_success = true;
+  }
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -423,10 +426,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
+  file_deny_write (file);
+  thread_current ()->execute_file = file;
 
- done:
+done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  if (success == false)
+  {
+    file_close (file);
+  }
   return success;
 }
 

@@ -10,11 +10,10 @@
 #include "filesys/filesys.h"
 #include "threads/vaddr.h"
 
-#define ARG(x) (*(int*)(f->esp+(4*x)))
+#define ARG(x) (f->esp+(4*x))
 #define MAX_CONSOLE_WRITE 400
 
 static void syscall_handler (struct intr_frame *);
-
 
 struct lock file_lock;
 
@@ -38,6 +37,20 @@ bool is_valid_file (int fd)
   return true;
 }
 
+int arg_get (int *p)
+{
+  if (is_valid_address (p) == true) 
+  {
+    return *p;
+  }
+  
+  else 
+  {
+    syscall_exit (-1);
+    return -1;
+  }
+}
+
 void syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -51,8 +64,6 @@ void syscall_halt (void)
 
 void syscall_exit (int status)
 {
-//  printf ("real status %d \n", status);
-//  ASSERT(false);
   printf ("%s: exit(%d)\n", thread_current ()->name, status);
   thread_current ()->exit_status = status;
 
@@ -71,7 +82,7 @@ int syscall_wait (int pid)
 
 bool syscall_create (const char *file, unsigned int initial_size)
 {
-  if (file == NULL) syscall_exit(-1);
+  if (file == NULL) syscall_exit (-1);
 
   lock_acquire (&file_lock);
   bool ret = filesys_create(file, initial_size);
@@ -82,7 +93,7 @@ bool syscall_create (const char *file, unsigned int initial_size)
 
 bool syscall_remove (const char *file)
 {
-  if (file == NULL) return false;
+  if (file == NULL) syscall_exit (-1);;
 
   lock_acquire (&file_lock);
   bool ret = filesys_remove (file);
@@ -95,8 +106,6 @@ int syscall_read (int fd, void *buffer, unsigned size)
 {
   int ret = -2;
   unsigned i;
-
-//  printf ("read fd %d\n", fd);
 
   if (fd == 0)
   {
@@ -115,11 +124,6 @@ int syscall_read (int fd, void *buffer, unsigned size)
 
   else 
   {
-    // open fail conditions
-    // closed.
-    // invalid fd
-    //
-    // need fd -> filename
     if (is_valid_file (fd) == false) ret = -1;
     
     else 
@@ -130,7 +134,6 @@ int syscall_read (int fd, void *buffer, unsigned size)
     }
   }
 
-//  printf("%d %u::TESTSETSETEST\n\n", ret, ret);
   return ret;
 }
 
@@ -156,8 +159,6 @@ int syscall_write (int fd, const void *buffer, unsigned size)
   else
   {
     if (is_valid_file (fd) == false) ret = -1;
-
-    else if (thread_current ()->files[fd]->deny_write == true) ret = -1;
 
     else
     {
@@ -204,11 +205,6 @@ int syscall_open (const char *file)
       ASSERT(cur->files[ret] == NULL);
       cur->files[ret] = open_file;
     }
-  }
-
-//  if (open_file->inode->open_cnt > 0)
-  {
-    file_deny_write (open_file);
   }
 
   return ret;
@@ -260,44 +256,39 @@ void syscall_close (int fd)
   if (is_valid_file (fd) == false) return;
 
   lock_acquire (&file_lock);
-  if (thread_current ()->files[fd]->deny_write == true)
-  {
-    file_allow_write (thread_current ()->files[fd]);
-  }
   file_close (thread_current()->files[fd]);
   lock_release (&file_lock);
 
   thread_current()->files[fd] = NULL;
   
   struct empty_fd *e = palloc_get_page (0);
-  ASSERT ( e != NULL);
+  ASSERT (e != NULL);
 
   e->fd = fd;
 
-
-  list_push_front (&thread_current() -> empty_fd_list, &e->fd_elem);
+  list_push_front (&thread_current()->empty_fd_list, &e->fd_elem);
 }
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  int syscall_num = ARG(0);
+  int syscall_num = arg_get(ARG(0));
 
   switch (syscall_num)
   {
     case SYS_HALT: syscall_halt (); break;
-    case SYS_EXIT: syscall_exit (ARG(1)); break;
-    case SYS_EXEC: f->eax = syscall_exec (ARG(1)); break;
-    case SYS_WAIT: f->eax = syscall_wait (ARG(1)); break;
-    case SYS_CREATE: f->eax = syscall_create (ARG(1), ARG(2)); break;
-    case SYS_REMOVE: f->eax = syscall_remove (ARG(1)); break;
-    case SYS_OPEN: f->eax = syscall_open (ARG(1)); break;
-    case SYS_FILESIZE: f->eax = syscall_filesize (ARG(1)); break;
-    case SYS_READ: f->eax = syscall_read (ARG(1), ARG(2), ARG(3)); break;
-    case SYS_WRITE: f->eax = syscall_write (ARG(1), ARG(2), ARG(3)); break;
-    case SYS_SEEK: syscall_seek (ARG(1), ARG(2)); break;
-    case SYS_TELL: f->eax = syscall_tell (ARG(1)); break;
-    case SYS_CLOSE: syscall_close (ARG(1)); break;
+    case SYS_EXIT: syscall_exit (arg_get(ARG(1))); break;
+    case SYS_EXEC: f->eax = syscall_exec (arg_get(ARG(1))); break;
+    case SYS_WAIT: f->eax = syscall_wait (arg_get(ARG(1))); break;
+    case SYS_CREATE: f->eax = syscall_create (arg_get(ARG(1)), arg_get(ARG(2))); break;
+    case SYS_REMOVE: f->eax = syscall_remove (arg_get(ARG(1))); break;
+    case SYS_OPEN: f->eax = syscall_open (arg_get(ARG(1))); break;
+    case SYS_FILESIZE: f->eax = syscall_filesize (arg_get(ARG(1))); break;
+    case SYS_READ: f->eax = syscall_read (arg_get(ARG(1)), arg_get(ARG(2)), arg_get(ARG(3))); break;
+    case SYS_WRITE: f->eax = syscall_write (arg_get(ARG(1)), arg_get(ARG(2)), arg_get(ARG(3))); break;
+    case SYS_SEEK: syscall_seek (arg_get(ARG(1)), arg_get(ARG(2))); break;
+    case SYS_TELL: f->eax = syscall_tell (arg_get(ARG(1))); break;
+    case SYS_CLOSE: syscall_close (arg_get(ARG(1))); break;
     default: ASSERT(false); break;
   } 
 }
