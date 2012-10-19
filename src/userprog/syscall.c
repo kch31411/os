@@ -15,6 +15,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
+
 struct lock file_lock;
 
 bool is_valid_address (void *a)
@@ -60,7 +61,6 @@ void syscall_exit (int status)
 
 int syscall_exec (const char *cmd_line)
 {
-  if (is_valid_address (cmd_line) == false) ASSERT(false);
   return process_execute (cmd_line);
 }
 
@@ -72,7 +72,6 @@ int syscall_wait (int pid)
 bool syscall_create (const char *file, unsigned int initial_size)
 {
   if (file == NULL) syscall_exit(-1);
-//    return false;
 
   lock_acquire (&file_lock);
   bool ret = filesys_create(file, initial_size);
@@ -156,13 +155,9 @@ int syscall_write (int fd, const void *buffer, unsigned size)
 
   else
   {
-    // write fail conditions
-    // closed
-    // other user write
-    // invalid fd
-    //
-    //
     if (is_valid_file (fd) == false) ret = -1;
+
+    else if (thread_current ()->files[fd]->deny_write == true) ret = -1;
 
     else
     {
@@ -177,15 +172,16 @@ int syscall_write (int fd, const void *buffer, unsigned size)
 
 int syscall_open (const char *file)
 {
-  if (file == NULL) syscall_exit(-1);
-  
+  int ret;
+
+  if (file == NULL) syscall_exit(-1);  
+
   lock_acquire (&file_lock);
   struct file *open_file = filesys_open (file);
   lock_release (&file_lock);
   
   if (open_file == NULL)
   {
-//    printf ("open faield\\n");
     return -1;
   }
 
@@ -195,22 +191,27 @@ int syscall_open (const char *file)
     
     if (list_empty(&cur->empty_fd_list))
     {
- //     printf ("new fd_idx %d\n", cur->fd_idx);
       cur->files[cur->fd_idx] = open_file;
-      return cur->fd_idx++;
+      ret = cur->fd_idx++;
     }
 
     else 
     {
       struct empty_fd *e = list_entry (list_pop_front (&cur->empty_fd_list), struct empty_fd, fd_elem);
-      int ret = e->fd;
+      ret = e->fd;
       palloc_free_page (e); 
 
       ASSERT(cur->files[ret] == NULL);
       cur->files[ret] = open_file;
-      return ret;
     }
   }
+
+//  if (open_file->inode->open_cnt > 0)
+  {
+    file_deny_write (open_file);
+  }
+
+  return ret;
 }
 
 int syscall_filesize (int fd)
@@ -259,6 +260,10 @@ void syscall_close (int fd)
   if (is_valid_file (fd) == false) return;
 
   lock_acquire (&file_lock);
+  if (thread_current ()->files[fd]->deny_write == true)
+  {
+    file_allow_write (thread_current ()->files[fd]);
+  }
   file_close (thread_current()->files[fd]);
   lock_release (&file_lock);
 
@@ -269,7 +274,8 @@ void syscall_close (int fd)
 
   e->fd = fd;
 
-  list_push_front ( &thread_current() -> empty_fd_list, &e->fd_elem);
+
+  list_push_front (&thread_current() -> empty_fd_list, &e->fd_elem);
 }
 
 static void

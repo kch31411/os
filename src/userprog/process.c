@@ -36,8 +36,6 @@ process_execute (const char *file_name)
   char *name;
 
   struct thread *t = thread_current ();
-  struct list_elem *e;
-  bool create_success;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -53,6 +51,7 @@ process_execute (const char *file_name)
   strtok_r(name, " ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
+  t->create_success = false;
   tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
 
   palloc_free_page (name);
@@ -60,19 +59,7 @@ process_execute (const char *file_name)
   // stop
   sema_down (&thread_current ()->create_sema);
 
-  create_success = false;
-  for (e = list_begin (&t->child_list); e != list_end (&t->child_list); e = list_next (e))
-  {
-    struct thread *c = list_entry (e, struct thread, child_elem);
-
-    if (c->tid == tid) 
-    {
-      create_success = true;
-      break;
-    }
-  }
-
-  if (create_success == false) tid = TID_ERROR;
+  if (t->create_success == false) tid = TID_ERROR; 
   
   if (tid == TID_ERROR)
   {
@@ -101,8 +88,7 @@ start_process (void *f_name)
 
 //  printf ("will load\n");
   success = load (file_name, &if_.eip, &if_.esp);
-
-//  printf("load end\n");
+  if (success == true) thread_current ()->parent->create_success = true;
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -312,6 +298,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
+
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
