@@ -33,6 +33,11 @@ process_execute (const char *file_name)
   char *fn_copy;
   char *save_ptr;
   tid_t tid;
+  char *name;
+
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  bool create_success;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -41,14 +46,33 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
-  // Tokenizing
-  strtok_r(file_name, " ", &save_ptr);
+  name = palloc_get_page (0);
+  if (name == NULL)
+    return TID_ERROR;
+  strlcpy (name, file_name, PGSIZE);
+  strtok_r(name, " ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
+
+  palloc_free_page (name);
 
   // stop
   sema_down (&thread_current ()->create_sema);
+
+  create_success = false;
+  for (e = list_begin (&t->child_list); e != list_end (&t->child_list); e = list_next (e))
+  {
+    struct thread *c = list_entry (e, struct thread, child_elem);
+
+    if (c->tid == tid) 
+    {
+      create_success = true;
+      break;
+    }
+  }
+
+  if (create_success == false) tid = TID_ERROR;
   
   if (tid == TID_ERROR)
   {
@@ -75,15 +99,21 @@ start_process (void *f_name)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
+//  printf ("will load\n");
   success = load (file_name, &if_.eip, &if_.esp);
+
+//  printf("load end\n");
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
 
   sema_up (&thread_current ()->parent->create_sema);
 
-  if (!success) 
-    thread_exit ();
+  if (!success)
+  {
+    syscall_exit (-1); 
+//    thread_exit ();
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

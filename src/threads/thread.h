@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "synch.h"
 
+#include "filesys/file.h"
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -25,8 +27,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-
-#define MAX_FILE 300
+#define MAX_FILE 100
 
 /* A kernel thread or user process.
 
@@ -109,7 +110,7 @@ struct thread
     int exit_status;
 
     int fd_idx;
-    struct file files[MAX_FILE];
+    struct file *files[MAX_FILE];
     struct list empty_fd_list;
 
     struct semaphore create_sema;
