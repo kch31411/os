@@ -25,6 +25,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+
+#define MAX_FILE 300
+
 /* A kernel thread or user process.
 
    Each thread structure is stored in its own 4 kB page.  The
@@ -105,6 +108,10 @@ struct thread
 
     int exit_status;
 
+    int fd_idx;
+    struct file files[MAX_FILE];
+    struct list empty_fd_list;
+
     struct semaphore create_sema;
     struct semaphore end_sema;
 
@@ -117,6 +124,12 @@ struct dead_child
   tid_t tid;
   int exit_status;
   struct list_elem child_elem;
+};
+
+struct empty_fd
+{
+  int fd;
+  struct list_elem fd_elem;
 };
 
 /* If false (default), use round-robin scheduler.

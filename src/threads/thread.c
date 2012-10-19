@@ -468,6 +468,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->exit_status = -1;
   sema_init(&t->create_sema, 0);
   sema_init(&t->end_sema, 0);
+
+  list_init($t->empty_fd_list);
+  fd_idx = 0;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
