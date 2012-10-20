@@ -284,36 +284,59 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
 
-#ifdef USERPROG
-  process_exit ();
-#endif
-
   struct thread *cur = thread_current ();
   struct dead_child *dc;
+  int i;
 
   dc = palloc_get_page (0);
+  ASSERT (dc != NULL);
+
   dc->tid = cur->tid;
   dc->exit_status = cur->exit_status;
   
   list_remove(&cur->child_elem);
-  if (cur->parent != NULL)
+  if (cur->parent != NULL && cur->load_success == true)
   {
-    list_push_back(&cur->parent->dead_list, &dc->child_elem);
+    list_push_back (&cur->parent->dead_list, &dc->child_elem);
   }
 
+  // file close
+  for (i = 0; i < cur->fd_idx; i++)
+  {
+    if (cur->files[i] != NULL) file_close (cur->files[i]);
+  }
+ 
+  // execute file close 
   if (cur->execute_file != NULL) 
   {
     file_allow_write (cur->execute_file);
   }
   file_close (cur->execute_file);
 
+  // dead child
+  while (list_empty (&cur->dead_list) == false)
+  {
+    dc = list_entry (list_pop_front (&cur->dead_list), struct dead_child, child_elem);
+    palloc_free_page (dc);
+  }
+
+  // empty_fd_list 
+  while (list_empty (&cur->empty_fd_list) == false)
+  {
+    struct empty_fd *ef = list_entry (list_pop_front (&cur->empty_fd_list), struct empty_fd, fd_elem);
+    palloc_free_page (ef);
+  }
+
+#ifdef USERPROG
+  process_exit ();
+#endif
+
   sema_up (&cur->end_sema);
-  
-  // TODO: memory release
 
   /* Just set our status to dying and schedule another process.
      We will be destroyed during the call to schedule_tail(). */
   intr_disable ();
+
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -475,6 +498,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->create_sema, 0);
   sema_init(&t->end_sema, 0);
 
+  t->load_success = false;
   list_init(&t->empty_fd_list);
   t->fd_idx = 2;
 }

@@ -41,12 +41,19 @@ process_execute (const char *file_name)
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
+  {
+    palloc_free_page(fn_copy);
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
 
   name = palloc_get_page (0);
   if (name == NULL)
+  {
+    palloc_free_page(fn_copy);
+    palloc_free_page(name);
     return TID_ERROR;
+  }
   strlcpy (name, file_name, PGSIZE);
   strtok_r(name, " ", &save_ptr);
 
@@ -74,8 +81,6 @@ process_execute (const char *file_name)
 static void
 start_process (void *f_name)
 {
-//  printf("start process\n\n\n\n");
-
   char *file_name = f_name;
   struct intr_frame if_;
   bool success;
@@ -86,12 +91,10 @@ start_process (void *f_name)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-//  printf ("will load\n");
   success = load (file_name, &if_.eip, &if_.esp);
-  if (success == true)
-  {
-    thread_current ()->parent->create_success = true;
-  }
+  
+  thread_current ()->parent->create_success = success;
+  
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -100,8 +103,7 @@ start_process (void *f_name)
 
   if (!success)
   {
-    syscall_exit (-1); 
-//    thread_exit ();
+    syscall_exit (-1);
   }
 
   /* Start the user process by simulating a return from an
@@ -426,6 +428,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
+  thread_current ()->load_success = true;
+
   file_deny_write (file);
   thread_current ()->execute_file = file;
 

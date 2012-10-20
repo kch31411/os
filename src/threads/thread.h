@@ -25,7 +25,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define MAX_FILE 100
+#define MAX_FILE 128
 
 /* A kernel thread or user process.
 
@@ -114,13 +114,13 @@ struct thread
     struct semaphore create_sema;
     struct semaphore end_sema;
 
+    bool load_success;
     bool create_success;
     struct file *execute_file;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
 
 struct dead_child
 {

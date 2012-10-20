@@ -46,7 +46,7 @@ int arg_get (int *p)
   
   else 
   {
-    syscall_exit (-1);
+//    syscall_exit (-1);
     return -1;
   }
 }
@@ -82,7 +82,10 @@ int syscall_wait (int pid)
 
 bool syscall_create (const char *file, unsigned int initial_size)
 {
-  if (file == NULL) syscall_exit (-1);
+  if (file == NULL) 
+  {
+    syscall_exit (-1);
+  }
 
   lock_acquire (&file_lock);
   bool ret = filesys_create(file, initial_size);
@@ -93,7 +96,10 @@ bool syscall_create (const char *file, unsigned int initial_size)
 
 bool syscall_remove (const char *file)
 {
-  if (file == NULL) syscall_exit (-1);;
+  if (file == NULL) 
+  {
+    syscall_exit (-1);
+  }
 
   lock_acquire (&file_lock);
   bool ret = filesys_remove (file);
@@ -175,7 +181,10 @@ int syscall_open (const char *file)
 {
   int ret;
 
-  if (file == NULL) syscall_exit(-1);  
+  if (file == NULL)
+  {
+    syscall_exit(-1);
+  }
 
   lock_acquire (&file_lock);
   struct file *open_file = filesys_open (file);
@@ -190,7 +199,7 @@ int syscall_open (const char *file)
   {
     struct thread *cur = thread_current();
     
-    if (list_empty(&cur->empty_fd_list))
+    if (list_empty (&cur->empty_fd_list) == true)
     {
       cur->files[cur->fd_idx] = open_file;
       ret = cur->fd_idx++;
@@ -200,9 +209,10 @@ int syscall_open (const char *file)
     {
       struct empty_fd *e = list_entry (list_pop_front (&cur->empty_fd_list), struct empty_fd, fd_elem);
       ret = e->fd;
+
       palloc_free_page (e); 
 
-      ASSERT(cur->files[ret] == NULL);
+      ASSERT (cur->files[ret] == NULL);
       cur->files[ret] = open_file;
     }
   }
@@ -253,20 +263,20 @@ unsigned syscall_tell (int fd)
 
 void syscall_close (int fd)
 {
-  if (is_valid_file (fd) == false) return;
-
-  lock_acquire (&file_lock);
-  file_close (thread_current()->files[fd]);
-  lock_release (&file_lock);
-
-  thread_current()->files[fd] = NULL;
-  
   struct empty_fd *e = palloc_get_page (0);
   ASSERT (e != NULL);
 
+  if (is_valid_file (fd) == false) return;
+
+  lock_acquire (&file_lock);
+  file_close (thread_current ()->files[fd]);
+  lock_release (&file_lock);
+
+  thread_current()->files[fd] = NULL;
+
   e->fd = fd;
 
-  list_push_front (&thread_current()->empty_fd_list, &e->fd_elem);
+  list_push_front (&thread_current ()->empty_fd_list, &e->fd_elem);
 }
 
 static void
