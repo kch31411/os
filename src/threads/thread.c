@@ -294,7 +294,10 @@ thread_exit (void)
   dc->tid = cur->tid;
   dc->exit_status = cur->exit_status;
   
-  list_remove(&cur->child_elem);
+  if (&cur->child_elem != NULL)
+  {
+    list_remove(&cur->child_elem);
+  }
   if (cur->parent != NULL && cur->load_success == true)
   {
     list_push_back (&cur->parent->dead_list, &dc->child_elem);
@@ -448,7 +451,6 @@ static void
 kernel_thread (thread_func *function, void *aux) 
 {
   ASSERT (function != NULL);
-                    
   intr_enable ();       /* The scheduler runs with interrupts off. */
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
@@ -492,6 +494,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   t->parent = NULL;
+  &t->child_elem = NULL;
   list_init(&t->child_list);
   list_init(&t->dead_list);
   t->exit_status = -1;

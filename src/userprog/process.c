@@ -427,6 +427,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
+  if (esp < eip) goto done;
+
   success = true;
   thread_current ()->load_success = true;
 
