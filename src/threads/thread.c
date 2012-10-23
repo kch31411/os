@@ -294,7 +294,7 @@ thread_exit (void)
   dc->tid = cur->tid;
   dc->exit_status = cur->exit_status;
   
-  if (&cur->child_elem != NULL)
+  if ( &cur->child_elem != NULL && (&cur->child_elem)->prev != NULL && (&cur->child_elem)->next != NULL )
   {
     list_remove(&cur->child_elem);
   }
@@ -494,7 +494,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   t->parent = NULL;
-  &t->child_elem = NULL;
   list_init(&t->child_list);
   list_init(&t->dead_list);
   t->exit_status = -1;
