@@ -112,6 +112,7 @@ pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool writable)
     {
       ASSERT ((*pte & PTE_P) == 0);
       *pte = pte_create_user (kpage, writable);
+      // TODO : setting supplement page table
       return true;
     }
   else
@@ -153,6 +154,7 @@ pagedir_clear_page (uint32_t *pd, void *upage)
     {
       *pte &= ~PTE_P;
       invalidate_pagedir (pd);
+      // TODO : also SPT
     }
 }
 
