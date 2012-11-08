@@ -34,6 +34,7 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+#include "vm/frame.h"
 
 /* Amount of physical memory, in 4 kB pages. */
 size_t ram_pages;
@@ -87,6 +88,8 @@ main (void)
   palloc_init ();
   malloc_init ();
   paging_init ();
+  
+  
 
   /* Segmentation. */
 #ifdef USERPROG
@@ -177,6 +180,9 @@ paging_init (void)
 
       pt[pte_idx] = pte_create_kernel (vaddr, !in_kernel_text);
     }
+
+  // frame table init
+  hash_init(&frames, frame_hash, frame_less, NULL);
 
   /* Store the physical address of the page directory into CR3
      aka PDBR (page directory base register).  This activates our
