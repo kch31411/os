@@ -18,7 +18,7 @@ page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNU
   return a->addr < b->addr;
 }
 
-void 
+bool 
 page_create (void *addr)
 {
   struct page p;
@@ -30,12 +30,15 @@ page_create (void *addr)
   ASSERT (e = hash_find (&t->pages, &p.elem) == NULL);
 
   new = malloc (sizeof (struct page));
+  if (new == NULL) return false;
 
   new->addr = addr;
   new->disk_no = NULL;
   new->isDisk = false; 
 
   hash_insert (&t->pages, &new->elem);
+
+  return true;
 }
 
 /* Returns the page containing the given virtual address,

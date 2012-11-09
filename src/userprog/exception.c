@@ -4,6 +4,8 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "vm/page.h"
+#include "threads/palloc.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -152,8 +154,31 @@ page_fault (struct intr_frame *f)
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
 
-//  printf("PAGE FAULT!\n\n\n\n");
-  syscall_exit(-1);
+  struct page *p = page_lookup (thread_current (), fault_addr);
+
+  if (p->isDisk == true)
+  { 
+    uint8_t *kpage;
+    bool success = false;
+
+    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+    if (kpage != NULL) 
+    {
+      success = (pagedir_set_page (thread_current ()->pagedir, fault_addr, kpage, true) && page_create (fault_addr));
+    }
+    
+    ASSERT (success == true);
+
+    swap_in (p->disk_no, kpage);
+
+    p->isDisk = false;
+    p->disk_no = NULL;
+  }
+
+  else
+  {
+    syscall_exit(-1);
+  }
 
   printf ("Page fault at %p: %s error %s page in %s context.\n",
           fault_addr,

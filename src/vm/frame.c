@@ -134,7 +134,7 @@ frame_reset_accessed (struct frame *f)
 }
 
 struct frame* 
-victim ()
+frame_victim ()
 {
   struct hash_elem *e;
 

@@ -1,7 +1,6 @@
 #include <hash.h>
 #include <list.h>
 #include <debug.h>
-#include "threads/thread.h"
 
 struct page_pointer
 {
@@ -29,5 +28,5 @@ struct frame* frame_find (void *phy_addr);
 void frame_delete (void *phy_addr, bool isForce);
 bool frame_is_accessed (struct frame *f);
 void frame_reset_accessed (struct frame *f);
-struct frame* victim (void);
+struct frame* frame_victim (void);
 

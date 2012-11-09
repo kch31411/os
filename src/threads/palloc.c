@@ -11,6 +11,9 @@
 #include "threads/loader.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
+#include "devices/disk.h"
+#include "vm/page.h"
 
 /* Page allocator.  Hands out memory in page-size (or
    page-multiple) chunks.  See malloc.h for an allocator that
@@ -94,14 +97,39 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     pages = NULL;
 
   if (pages != NULL) 
-    {
-      if (flags & PAL_ZERO)
-        memset (pages, 0, PGSIZE * page_cnt);
-    }
+  {
+    if (flags & PAL_ZERO)
+      memset (pages, 0, PGSIZE * page_cnt);
+  }
+  
   else 
+  {
+    struct frame *f = frame_victim ();
+    int i;
+
+    for (i = 0; i < page_cnt; i++)
     {
-       
+      disk_sector_t disk_no = swap_out (f->phy_addr + PGSIZE * i);
+      
+      struct list l = f->refer_pages;
+      struct list_elem *e;
+      for (e = list_begin (&l); e != list_end (&l); e = list_next (e))
+      {
+        struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
+
+        pagedir_clear_page (pp->thread->pagedir, pp->addr);
+        // TODO : swap should track all the pages indicating the disk slot
+        frame_delete (f->phy_addr + PGSIZE * i, true);
+
+        struct page *p = page_lookup (pp->thread, pp->addr);
+        
+        p->disk_no = disk_no;
+        p->isDisk = true;
+      }
     }
+
+    pages = f->phy_addr;
+  }
 
   return pages;
 }
