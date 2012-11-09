@@ -35,6 +35,7 @@
 #include "filesys/fsutil.h"
 #endif
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Amount of physical memory, in 4 kB pages. */
 size_t ram_pages;
@@ -182,7 +183,8 @@ paging_init (void)
     }
 
   // frame table init
-  hash_init(&frames, frame_hash, frame_less, NULL);
+  frame_init ();
+  swap_init ();
 
   /* Store the physical address of the page directory into CR3
      aka PDBR (page directory base register).  This activates our

@@ -1,22 +1,20 @@
 #include <bitmap.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <inttypes.h>
+#include "devices/disk.h"
+#include "threads/vaddr.h"
+#include "threads/synch.h"
 
+#define SEC_PER_PG (PGSIZE / DISK_SECTOR_SIZE)
 
-/* only one swap table neccessary 
- * thus no need for make structure?????????
-struct swap {
-    struct lock lock;   // for lock related to swap table
-    struct bitmap *used_slot;
-
-}
-*/
-
-struct bitmap *swap_slot;       // 
-
+struct bitmap *swap_slot;
+struct lock swap_lock;
+struct disk *swap_disk;
 
 void swap_init (void);
-void *swap_get_slot (enum palloc_flags);
-void *swap_get_multiple (enum palloc_flags, size_t page_cnt);
-void swap_free_page (void *);
-void swap_free_multiple (void *, size_t page_cnt);
-
+disk_sector_t swap_get_slot (void);
+void swap_free_slot (disk_sector_t);
+disk_sector_t swap_out (void* phy_addr);
+void swap_in (disk_sector_t disk_no, void *phy_addr);
 

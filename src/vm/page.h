@@ -1,36 +1,20 @@
 #include <hash.h>
+#include <stdbool.h>
+#include <debug.h>
+#include "devices/disk.h"
+#include "threads/thread.h"
 
-struct page { // supplement page table
-  struct hash_elem hash_elem;   // for hash
+struct page  // supplement page table
+{
+  struct hash_elem elem;   // for hash
   void *addr;                   // virtual address
-  // XXX addr of swap slot
-  bool canFree;                   // when process terminate 
-  // XXX add more
+  disk_sector_t disk_no;
+  bool isDisk;  
 };
 
-
-// XXX struct pgae* page_create
-
-
-/* Returns a hash value for page p. */
-unsigned
-page_hash (const struct hash_elem *p_, void *aux UNUSED)
-{
-  const struct page *p = hash_entry (p_, struct page, hash_elem);
-  return hash_bytes (&p->addr, sizeof p->addr);
-}
-
-/* Returns true if page a precedes page b. */
-bool
-page_less (const struct hash_elem *a_, const struct hash_elem *b_,
-               void *aux UNUSED)
-{
-  const struct page *a = hash_entry (a_, struct page, hash_elem);
-  const struct page *b = hash_entry (b_, struct page, hash_elem);
-
-  return a->addr < b->addr;
-}
-
-
-struct page * page_lookup (const void *address);
+unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);
+bool page_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+void page_create (void *addr);
+struct page *page_lookup (struct thread *t, const void *addr);
+void page_delete (void *addr);
 

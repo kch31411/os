@@ -331,6 +331,10 @@ thread_exit (void)
     palloc_free_page (ef);
   }
 
+  // pages
+  // TODO delete swap slots
+  // TODO delete frames & pages
+
 #ifdef USERPROG
   process_exit ();
 #endif

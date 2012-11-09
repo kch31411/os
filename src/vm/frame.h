@@ -1,5 +1,7 @@
 #include <hash.h>
 #include <list.h>
+#include <debug.h>
+#include "threads/thread.h"
 
 struct page_pointer
 {
@@ -20,19 +22,12 @@ struct frame
 struct hash frames;
 static struct hash_iterator frame_iter;
 
-unsigned 
-frame_hash (const struct hash_elem *f_, void *aux UNUSED)
-{
-  const struct frame *f = hash_entry (f_, struct frame, elem);
-  return hash_bytes (&f->phy_addr, sizeof f->phy_addr);
-}
-
-bool
-frame_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED)
-{
-  const struct frame *a = hash_entry (a_, struct frame, elem);
-  const struct frame *b = hash_entry (b_, struct frame, elem);
-
-  return a->phy_addr < b->phy_addr;
-}
+unsigned frame_hash (const struct hash_elem *f_, void *aux UNUSED);
+bool frame_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+void frame_create (void* phy_addr, void* page_addr);
+struct frame* frame_find (void *phy_addr);
+void frame_delete (void *phy_addr, bool isForce);
+bool frame_is_accessed (struct frame *f);
+void frame_reset_accessed (struct frame *f);
+struct frame* victim (void);
 
