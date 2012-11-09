@@ -1,3 +1,4 @@
+#include <debug.h>
 #include "vm/swap.h"
 
 void 
@@ -28,6 +29,11 @@ swap_out (void* phy_addr)
 
   int i;
   disk_sector_t ret = swap_get_slot ();
+
+  if (ret == BITMAP_ERROR)
+  {
+    PANIC ("swap_out: swap disk is full");
+  }
 
   for (i = 0; i < SEC_PER_PG; i++)
   {
