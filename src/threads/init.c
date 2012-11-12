@@ -34,8 +34,6 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
-#include "vm/frame.h"
-#include "vm/swap.h"
 
 /* Amount of physical memory, in 4 kB pages. */
 size_t ram_pages;
@@ -76,7 +74,9 @@ main (void)
   /* Break command line into arguments and parse options. */
   argv = read_command_line ();
   argv = parse_options (argv);
-
+   
+  palloc_init ();
+  
   /* Initialize ourselves as a thread so we can use locks,
      then enable console locking. */
   thread_init ();
@@ -86,11 +86,9 @@ main (void)
   printf ("Pintos booting with %'zu kB RAM...\n", ram_pages * PGSIZE / 1024);
 
   /* Initialize memory system. */
-  palloc_init ();
+//  palloc_init ();
   malloc_init ();
   paging_init ();
-  
-  
 
   /* Segmentation. */
 #ifdef USERPROG
@@ -118,6 +116,9 @@ main (void)
   disk_init ();
   filesys_init (format_filesys);
 #endif
+
+  frame_init ();
+  swap_init ();
 
   printf ("Boot complete.\n");
   
@@ -181,10 +182,6 @@ paging_init (void)
 
       pt[pte_idx] = pte_create_kernel (vaddr, !in_kernel_text);
     }
-
-  // frame table init
-  frame_init ();
-  swap_init ();
 
   /* Store the physical address of the page directory into CR3
      aka PDBR (page directory base register).  This activates our

@@ -119,13 +119,14 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
 
         pagedir_clear_page (pp->thread->pagedir, pp->addr);
         // TODO : swap should track all the pages indicating the disk slot
-        frame_delete (f->phy_addr + PGSIZE * i, true);
 
         struct page *p = page_lookup (pp->thread, pp->addr);
         
         p->disk_no = disk_no;
         p->isDisk = true;
       }
+
+      frame_delete (f->phy_addr + PGSIZE * i, true);
     }
 
     pages = f->phy_addr;

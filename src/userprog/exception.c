@@ -156,7 +156,7 @@ page_fault (struct intr_frame *f)
 
   struct page *p = page_lookup (thread_current (), fault_addr);
 
-  if (p->isDisk == true)
+  if (p != NULL && p->isDisk == true)
   { 
     uint8_t *kpage;
     bool success = false;
@@ -164,7 +164,7 @@ page_fault (struct intr_frame *f)
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
     if (kpage != NULL) 
     {
-      success = (pagedir_set_page (thread_current ()->pagedir, fault_addr, kpage, true) && page_create (fault_addr));
+      success = pagedir_set_page (thread_current ()->pagedir, fault_addr, kpage, true);
     }
     
     ASSERT (success == true);
@@ -173,6 +173,9 @@ page_fault (struct intr_frame *f)
 
     p->isDisk = false;
     p->disk_no = NULL;
+
+    // TODO : instruction restart
+    // f->eip += 4 ??
   }
 
   else

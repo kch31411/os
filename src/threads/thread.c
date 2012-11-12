@@ -15,6 +15,8 @@
 #include "userprog/process.h"
 #endif
 #include "vm/page.h"
+#include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -61,7 +63,6 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
-
 static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
@@ -201,6 +202,9 @@ thread_create (const char *name, int priority,
   list_push_back (&thread_current ()->child_list, &t->child_elem);
   t->parent = thread_current ();
 
+  // init supplemental page table
+  hash_init (&t->pages, page_hash, page_less, NULL);  
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -288,6 +292,7 @@ thread_exit (void)
   struct thread *cur = thread_current ();
   struct dead_child *dc;
   int i;
+  struct hash_iterator it;
 
   dc = palloc_get_page (0);
   ASSERT (dc != NULL);
@@ -314,8 +319,8 @@ thread_exit (void)
   if (cur->execute_file != NULL) 
   {
     file_allow_write (cur->execute_file);
+    file_close (cur->execute_file);
   }
-  file_close (cur->execute_file);
 
   // dead child
   while (list_empty (&cur->dead_list) == false)
@@ -331,9 +336,45 @@ thread_exit (void)
     palloc_free_page (ef);
   }
 
-  // pages
-  // TODO delete swap slots
-  // TODO delete frames & pages
+  // pages & frames & swap slots
+
+  /*
+  printf ("sise:%d\n", hash_size (&cur->pages));
+  hash_first (&it, &cur->pages);
+  while (hash_next (&it) != NULL)
+  {
+    struct page *p = hash_entry (hash_cur (&it), struct page, elem);
+    printf ("page %d-%x\n", p->isDisk, p->addr);
+  }
+
+  printf ("size F:%d\n", hash_size (&frames));
+  hash_first (&it, &frames);
+  while (hash_next (&it) != NULL)
+  {
+    struct frame *p = hash_entry (hash_cur (&it), struct frame, elem);
+    printf ("frame %x\n", p->phy_addr);
+  }
+  */
+ 
+  hash_first (&it, &cur->pages);
+  hash_next (&it);
+  while (hash_cur (&it) != NULL)
+  {
+    struct page *p = hash_entry (hash_cur (&it), struct page, elem);
+    hash_next (&it);
+
+    if (p->isDisk == true)
+    {
+      swap_free_slot (p->disk_no);
+    }
+
+    else
+    {
+      frame_delete (pagedir_get_page (cur->pagedir, p->addr), false);
+    }
+
+    page_delete (p->addr);
+  }
 
 #ifdef USERPROG
   process_exit ();
@@ -508,8 +549,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->load_success = false;
   list_init(&t->empty_fd_list);
   t->fd_idx = 2;
-
-  hash_init(&t->pages, page_hash, page_less, NULL);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

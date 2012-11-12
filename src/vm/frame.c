@@ -13,9 +13,11 @@ bool
 frame_less (const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED)
 {
   const struct frame *a = hash_entry (a_, struct frame, elem);
+//  printf ("A %x\n", a->phy_addr);
   const struct frame *b = hash_entry (b_, struct frame, elem);
+//  printf ("B %x\n", b->phy_addr);
 
-  return a->phy_addr < b->phy_addr;
+  return (a->phy_addr < b->phy_addr);
 }
 
 void
@@ -31,10 +33,9 @@ frame_create (void* phy_addr, void* page_addr)
   struct frame f;
   struct hash_elem *e;
   struct page_pointer *pp;
-  struct thread *t = thread_current ();
 
   pp = malloc (sizeof (struct page_pointer));
-  pp->thread = t;
+  pp->thread = thread_current ();
   pp->addr = page_addr;
 
   f.phy_addr = phy_addr;
@@ -42,7 +43,7 @@ frame_create (void* phy_addr, void* page_addr)
   if (e = hash_find (&frames, &f.elem) != NULL)
   {
     struct frame *fr = hash_entry (e, struct frame, elem);
-    list_insert (&fr->refer_pages, &pp->elem);
+    list_push_back (&fr->refer_pages, &pp->elem);
   }
 
   else
@@ -51,7 +52,7 @@ frame_create (void* phy_addr, void* page_addr)
   
     fr->phy_addr = phy_addr;
     list_init (&fr->refer_pages);
-    list_insert (&fr->refer_pages, &pp->elem);
+    list_push_back (&fr->refer_pages, &pp->elem);
     
     hash_insert (&frames, &fr->elem);
   }
@@ -74,17 +75,18 @@ frame_delete (void *phy_addr, bool isForce)
   struct frame f;
   struct frame *fr;
   struct hash_elem *eh;
-  struct thread *t = thread_current ();
-  struct list l;
+  struct list *l;
   struct list_elem *el;
 
   f.phy_addr = phy_addr;
 
   eh = hash_find (&frames, &f.elem);
+
+  ASSERT (eh != NULL);
   fr = hash_entry (eh, struct frame, elem);
 
-  l = fr->refer_pages;
-  for (el = list_begin (&l); el != list_end (&l); el = list_next (el))
+  l = &fr->refer_pages;
+  for (el = list_begin (l); el != list_end (l); el = list_next (l))
   {
     struct page_pointer *pp = list_entry (el, struct page_pointer, elem);
 
@@ -93,7 +95,7 @@ frame_delete (void *phy_addr, bool isForce)
       free (pp);
     }
 
-    else if (pp->thread == t) 
+    else if (pp->thread == thread_current ()) 
     {
       list_remove (el);
       free (pp);
@@ -101,7 +103,11 @@ frame_delete (void *phy_addr, bool isForce)
     }
   }
 
-  if (isForce == true || list_size (&l) == 0) free (fr);
+  if (isForce == true || list_size (l) == 0) 
+  {
+    hash_delete (&frames, eh);
+    free (fr);
+  }
 }
 
 bool

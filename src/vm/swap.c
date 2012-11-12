@@ -57,6 +57,7 @@ swap_in (disk_sector_t disk_no, void *phy_addr)
   {
     disk_read (swap_disk, disk_no+i, (phy_addr + DISK_SECTOR_SIZE * i));
   }
+  swap_free_slot (disk_no);
 
   lock_release (&swap_lock);
 }
