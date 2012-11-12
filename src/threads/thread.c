@@ -356,6 +356,8 @@ thread_exit (void)
     printf ("frame %x\n", p->phy_addr);
   }
   */
+  int tmp[ hash_size (&cur->pages) ];
+  int tmp_idx = 0;
  
   hash_first (&it, &cur->pages);
   hash_next (&it);
@@ -374,20 +376,15 @@ thread_exit (void)
       frame_delete (pagedir_get_page (cur->pagedir, p->addr), false);
     }
 
-    free(p);
+    tmp[tmp_idx++] = p->addr;
+  }
+
+  for (i = 0; i < hash_size (&cur->pages); i++)
+  {
+    page_delete (tmp[i]);
   }
 
   hash_destroy(&cur->pages, NULL);
-  /*
-  hash_first (&it, &cur->pages);
-  hash_next (&it);
-  while (!hash_empty (&cur->pages))
-  {
-    struct page *p = hash_entry (hash_cur (&it), struct page, elem);
-    hash_next (&it);
-    page_delete (kkkj
-  }
-*/
 
 #ifdef USERPROG
   process_exit ();
