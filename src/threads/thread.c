@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -339,7 +340,7 @@ thread_exit (void)
   // pages & frames & swap slots
 
   /*
-  printf ("sise:%d\n", hash_size (&cur->pages));
+  printf ("size:%d\n", hash_size (&cur->pages));
   hash_first (&it, &cur->pages);
   while (hash_next (&it) != NULL)
   {
@@ -373,8 +374,20 @@ thread_exit (void)
       frame_delete (pagedir_get_page (cur->pagedir, p->addr), false);
     }
 
-    page_delete (p->addr);
+    free(p);
   }
+
+  hash_destroy(&cur->pages, NULL);
+  /*
+  hash_first (&it, &cur->pages);
+  hash_next (&it);
+  while (!hash_empty (&cur->pages))
+  {
+    struct page *p = hash_entry (hash_cur (&it), struct page, elem);
+    hash_next (&it);
+    page_delete (kkkj
+  }
+*/
 
 #ifdef USERPROG
   process_exit ();

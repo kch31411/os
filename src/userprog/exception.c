@@ -6,6 +6,7 @@
 #include "threads/thread.h"
 #include "vm/page.h"
 #include "threads/palloc.h"
+#include "threads/vaddr.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -154,9 +155,11 @@ page_fault (struct intr_frame *f)
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
 
-  struct page *p = page_lookup (thread_current (), fault_addr);
+  struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
 
-  if (p != NULL && p->isDisk == true)
+//  printf ("isuser: %d, ADDR: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, page_lookup (thread_current (), pg_round_up (fault_addr)));
+
+  if (p != NULL && p->isDisk == true) // in disk
   { 
     uint8_t *kpage;
     bool success = false;
@@ -164,9 +167,8 @@ page_fault (struct intr_frame *f)
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
     if (kpage != NULL) 
     {
-      success = pagedir_set_page (thread_current ()->pagedir, fault_addr, kpage, true);
-    }
-    
+      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true);
+    } 
     ASSERT (success == true);
 
     swap_in (p->disk_no, kpage);
@@ -175,7 +177,24 @@ page_fault (struct intr_frame *f)
     p->disk_no = NULL;
 
     // TODO : instruction restart
-    // f->eip += 4 ??
+    return;
+  }
+
+  else if (is_user_vaddr (fault_addr) // stack growth
+      && p == NULL)
+  {
+    uint8_t *kpage;
+    bool success = false;
+
+    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+    if (kpage != NULL)
+    {
+      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true) && page_create (pg_round_down (fault_addr));
+    }
+
+    ASSERT (success == true);
+
+    return;
   }
 
   else
