@@ -112,6 +112,8 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     pages = f->phy_addr;
     for (i = 0; i < page_cnt; i++)
     {
+      ASSERT (i==0);
+
       struct frame *now = frame_find (f->phy_addr + PGSIZE * i);
       
    //   printf("Before swap_out : pid->%d, addr-> %x\n", thread_current()->tid, now->phy_addr);

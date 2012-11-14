@@ -7,6 +7,7 @@
 #include "vm/page.h"
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
 
 #define ABS(a) (((a) < (0))?-(a):(a))
 
@@ -165,7 +166,7 @@ page_fault (struct intr_frame *f)
 
   if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)// || is_user_vaddr (f->esp) == false)
   {
-//    printf ("case1\n");
+ //   printf ("case1\n");
  //   printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
     syscall_exit (-1);
   }
@@ -177,6 +178,9 @@ page_fault (struct intr_frame *f)
     bool success = false;
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  
+    lock_acquire (&frame_lock);
+
     if (kpage != NULL)
     { 
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true);
@@ -187,6 +191,8 @@ page_fault (struct intr_frame *f)
 
     p->isDisk = false;
     p->disk_no = NULL;
+
+    lock_release (&frame_lock);
 
     // TODO : instruction restart
     return;
@@ -200,6 +206,9 @@ page_fault (struct intr_frame *f)
     bool success = false;
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+
+    lock_acquire (&frame_lock);
+
     if (kpage != NULL)
     {
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true) && page_create (pg_round_down (fault_addr));
@@ -207,12 +216,14 @@ page_fault (struct intr_frame *f)
 
     ASSERT (success == true);
 
+    lock_release (&frame_lock);
+
     return;
   }
 
   else
   {
- //      printf ("case4\n");
+  //    printf ("case4\n");
  //   printf ("FOR DEBUG : page fault , will exit(-1)");
     syscall_exit (-1);
 //    thread_exit ();

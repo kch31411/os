@@ -91,6 +91,8 @@ frame_delete (void *phy_addr, bool isForce)
   f.phy_addr = phy_addr;
 
   eh = hash_find (&frames, &f.elem);
+
+//  if (eh == NULL) return;
   ASSERT (eh != NULL);
 
   fr = hash_entry (eh, struct frame, elem);
@@ -188,6 +190,8 @@ frame_victim ()
   return hash_entry (e, struct frame, elem);
   */
 
+  ASSERT ( list_empty (&frame_list) == false);
+
   while (1)
   {
     struct list_elem *e = list_pop_front (&frame_list);
@@ -197,6 +201,7 @@ frame_victim ()
 
     if (frame_is_accessed (f) == false)
     {
+      //printf("victim addr : %x\n", f->phy_addr);
        return f;
     }
 

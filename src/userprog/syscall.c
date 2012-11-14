@@ -64,6 +64,7 @@ void syscall_halt (void)
 
 void syscall_exit (int status)
 {
+  //printf ("PID: %d\n", thread_current ()->tid);
   printf ("%s: exit(%d)\n", thread_current ()->name, status);
   thread_current ()->exit_status = status;
 
