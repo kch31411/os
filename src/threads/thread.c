@@ -362,7 +362,16 @@ thread_exit (void)
   hash_first (&it, &cur->pages);
   hash_next (&it);
 
+  bool isLockAcquired = false;
+
+  if (lock_held_by_current_thread (&frame_lock) == false)
+  {
+    lock_acquire (&frame_lock);
+    isLockAcquired = true;
+  }
+
   lock_acquire (&swap_lock);
+  //    printf("ACQ tid %d  acquire swap lock\n", thread_current()->tid);
   while (hash_cur (&it) != NULL)
   {
     struct page *p = hash_entry (hash_cur (&it), struct page, elem);
@@ -385,7 +394,10 @@ thread_exit (void)
   {
     page_delete (tmp[i]);
   }
+  
   lock_release (&swap_lock);
+  if (isLockAcquired == true) lock_release (&frame_lock);
+   //   printf("REL tid %d  release swap lock\n", thread_current()->tid);
 
   hash_destroy(&cur->pages, NULL);
 

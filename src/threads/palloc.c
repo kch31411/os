@@ -104,7 +104,14 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   
   else 
   {
-    lock_acquire (&frame_lock);
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&frame_lock) == false) 
+    {
+      lock_acquire (&frame_lock);
+      isLockAcquired = true;
+    }
+    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
+
     struct frame *f = frame_victim ();
     int i;
 
@@ -134,8 +141,10 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
         p->isDisk = true;
       }
 
-      lock_release (&frame_lock);
+      //printf("REL tid %d  release frame lock\n", thread_current()->tid);
+
       frame_delete (f->phy_addr + PGSIZE * i, true);
+      if (isLockAcquired == true) lock_release (&frame_lock);
     }
   }
 

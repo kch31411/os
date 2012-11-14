@@ -180,6 +180,7 @@ page_fault (struct intr_frame *f)
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   
     lock_acquire (&frame_lock);
+    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
 
     if (kpage != NULL)
     { 
@@ -193,6 +194,7 @@ page_fault (struct intr_frame *f)
     p->disk_no = NULL;
 
     lock_release (&frame_lock);
+    //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
     // TODO : instruction restart
     return;
@@ -205,9 +207,10 @@ page_fault (struct intr_frame *f)
     uint8_t *kpage;
     bool success = false;
 
+    lock_acquire (&frame_lock);
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
-    lock_acquire (&frame_lock);
+    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
 
     if (kpage != NULL)
     {
@@ -217,6 +220,7 @@ page_fault (struct intr_frame *f)
     ASSERT (success == true);
 
     lock_release (&frame_lock);
+    //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
     return;
   }

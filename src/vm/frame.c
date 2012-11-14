@@ -80,7 +80,13 @@ frame_find (void *phy_addr)
 void 
 frame_delete (void *phy_addr, bool isForce)
 {
-  lock_acquire (&frame_lock);
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&frame_lock) == false)
+  {
+    lock_acquire (&frame_lock);
+    isLockAcquired = true;
+  }
+  //  printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
   
   struct frame f;
   struct frame *fr;
@@ -130,7 +136,9 @@ frame_delete (void *phy_addr, bool isForce)
     list_remove (&fr->list_elem);
     free (fr);
   }
-  lock_release (&frame_lock);
+
+  if (isLockAcquired == true) lock_release (&frame_lock);
+  //    printf("REL tid %d  release frame lock\n", thread_current()->tid);
 }
 
 bool
