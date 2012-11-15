@@ -19,4 +19,9 @@ void syscall_seek (int , unsigned);
 unsigned syscall_tell (int);
 void syscall_close (int);
 
+int syscall_mmap (int fd, void *addr, struct intr_frame *f);
+void syscall_munmap (int);
+
+
+
 #endif /* userprog/syscall.h */

@@ -15,6 +15,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "userprog/syscall.h"
 #include "vm/page.h"
 #include "vm/frame.h"
 #include "vm/swap.h"
@@ -313,7 +314,7 @@ thread_exit (void)
   // file close
   for (i = 0; i < cur->fd_idx; i++)
   {
-    if (cur->files[i] != NULL) file_close (cur->files[i]);
+    if (cur->files[i] != NULL) syscall_close(i);
   }
  
   // execute file close 
@@ -336,7 +337,13 @@ thread_exit (void)
     struct empty_fd *ef = list_entry (list_pop_front (&cur->empty_fd_list), struct empty_fd, fd_elem);
     palloc_free_page (ef);
   }
-
+  
+  // empty_mmap_list 
+  while (list_empty (&cur->empty_mmap_list) == false)
+  {
+    struct empty_mmap *ef = list_entry (list_pop_front (&cur->empty_mmap_list), struct empty_mmap, mmap_elem);
+    palloc_free_page (ef);
+  }
   // pages & frames & swap slots
 
   /*
@@ -574,6 +581,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->load_success = false;
   list_init(&t->empty_fd_list);
   t->fd_idx = 2;
+
+  list_init(&t->empty_mmap_list);
+  t->mmap_idx = 0;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

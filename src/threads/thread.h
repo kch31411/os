@@ -109,7 +109,7 @@ struct thread
     int exit_status;
 
     int fd_idx;
-    struct file *files[MAX_FILE];
+    struct file_info *files[MAX_FILE];
     struct list empty_fd_list;
 
     struct semaphore create_sema;
@@ -120,6 +120,10 @@ struct thread
     struct file *execute_file;
 
     struct hash pages;
+
+    int mmap_idx;
+    int mmap_list[MAX_FILE];
+    struct list empty_mmap_list;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
@@ -132,10 +136,25 @@ struct dead_child
   struct list_elem child_elem;
 };
 
+struct file_info
+{
+  struct file *file;
+  bool is_mapped;
+  int mapid;
+  int mm_size;
+  void *mm_addr;
+};
+
 struct empty_fd
 {
   int fd;
   struct list_elem fd_elem;
+};
+
+struct empty_mmap
+{
+  int mapid;
+  struct list_elem mmap_elem;
 };
 
 /* If false (default), use round-robin scheduler.
