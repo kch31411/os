@@ -209,6 +209,7 @@ int syscall_open (const char *file)
     {
       cur->files[cur->fd_idx]= palloc_get_page(0);
       cur->files[cur->fd_idx]->file = open_file;
+      cur->files[cur->fd_idx]->is_mapped = false;
       ret = cur->fd_idx++;
     }
 
@@ -279,14 +280,19 @@ void syscall_close (int fd)
 
   if (is_valid_file (fd) == false) return;
 
-  lock_acquire (&file_lock);
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false) 
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
+
   file_close (t->files[fd]->file);
-  lock_release (&file_lock);
+  if ( isLockAcquired == true ) lock_release (&file_lock);
 
   t->files[fd]->file = NULL;
 
   e->fd = fd;
-
   list_push_front (&t->empty_fd_list, &e->fd_elem);
 
   if ( t->files[fd]->is_mapped )
@@ -294,7 +300,7 @@ void syscall_close (int fd)
     syscall_munmap ( t->files[fd]->mapid );
   }
 
-  palloc_free_page(&t->files[fd]);
+  palloc_free_page(t->files[fd]);
   t->files[fd] = NULL;
 }
 
