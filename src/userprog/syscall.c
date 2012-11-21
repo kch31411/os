@@ -220,8 +220,6 @@ int syscall_open (const char *file)
 
       palloc_free_page (e); 
 
-      ASSERT (cur->files[ret]->file == NULL);
-
       cur->files[ret] = palloc_get_page(0);
       cur->files[ret]->file = open_file;
       cur->files[ret]->is_mapped = false;
