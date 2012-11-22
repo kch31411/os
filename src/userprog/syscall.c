@@ -285,6 +285,11 @@ void syscall_close (int fd)
     isLockAcquired = true;
   }
 
+  if ( t->files[fd]->is_mapped )
+  {
+    syscall_munmap ( t->files[fd]->mapid );
+  }
+
   file_close (t->files[fd]->file);
   if ( isLockAcquired == true ) lock_release (&file_lock);
 
@@ -292,11 +297,6 @@ void syscall_close (int fd)
 
   e->fd = fd;
   list_push_front (&t->empty_fd_list, &e->fd_elem);
-
-  if ( t->files[fd]->is_mapped )
-  {
-    syscall_munmap ( t->files[fd]->mapid );
-  }
 
   palloc_free_page(t->files[fd]);
   t->files[fd] = NULL;
@@ -323,7 +323,7 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
 
   int i;
   void *cur_addr = addr;
-  for (i=0; i<size; i++)
+  for (i=0; i<page_cnt; i++)
   {
     if (pagedir_get_page(t->pagedir, cur_addr) != NULL) return -1;
     if (page_lookup(t, cur_addr) != NULL ) return -1;
@@ -336,11 +336,26 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
   // now get frames
 
   // XXX : synch problem
-  void *kpage = palloc_get_multiple (PAL_USER | PAL_ZERO, size);
+  void *kpage = palloc_get_multiple (PAL_USER | PAL_ZERO, page_cnt);
   lock_acquire(&file_lock);
   int written = file_read ( file, kpage, size);
   lock_release(&file_lock);
   ASSERT (size == written);
+
+//  printf("upage : %x,  kpage : %x\n", addr, kpage);
+
+  cur_addr = addr;
+  void *cur_kpage = kpage;
+  for(i=0; i<page_cnt; i++)
+  {
+    // XXX: sync problem?
+    pagedir_set_page ( t->pagedir, cur_addr, cur_kpage, true);
+    page_create (cur_addr);
+
+    cur_addr += PGSIZE;
+    cur_kpage += PGSIZE;
+  }
+
 
   int ret = -2;
   if (list_empty (&t->empty_mmap_list) == true)
@@ -368,7 +383,6 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
   t->files[fd]->mm_size = size; // XXX: file size can varies hmm...
   t->files[fd]->mm_addr = addr;
 
-
   return ret;
 }
 void syscall_munmap (int mapid)
@@ -380,9 +394,13 @@ void syscall_munmap (int mapid)
   void *addr = file_info->mm_addr;
   void *kpage;
 
-  lock_acquire(&file_lock);
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false) 
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
   off_t pos = file_tell(file_info->file);
-  lock_release(&file_lock);
 
   int idx = 0;
   while (size > 0)
@@ -411,16 +429,18 @@ void syscall_munmap (int mapid)
     }
     else
     {
-      kpage = pagedir_get_page(addr);
+      kpage = pagedir_get_page(t->pagedir, addr);
     }
 
     if (pagedir_is_dirty(t->pagedir, addr))
     {
-      lock_acquire(&file_lock);
+      // XXX is dirty bit reliable after swapping???
       int written = file_write_at (file_info->file, kpage, size%PGSIZE, idx);
-      lock_release(&file_lock);
       ASSERT(written == size%PGSIZE);
     }
+
+    pagedir_clear_page(t->pagedir, pg_round_down (addr));
+    page_delete (pg_round_down (addr));
 
     // XXX: can always delete???
     frame_delete (kpage, true);
@@ -429,9 +449,8 @@ void syscall_munmap (int mapid)
     idx = idx + PGSIZE;
   }
 
-  lock_acquire(&file_lock);
   file_seek( file_info->file, pos);
-  lock_release(&file_lock);
+  if ( isLockAcquired == true ) lock_release (&file_lock);
 
   t->mmap_list[mapid] = 0;
   file_info->is_mapped = false;

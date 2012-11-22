@@ -34,6 +34,8 @@ frame_create (void* phy_addr, void* page_addr)
   struct hash_elem *e;
   struct page_pointer *pp;
 
+//  printf("try to CREAT frame %x\n", phy_addr);
+
   pp = malloc (sizeof (struct page_pointer));
   pp->thread = thread_current ();
   pp->addr = page_addr;

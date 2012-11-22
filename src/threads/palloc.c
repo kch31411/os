@@ -101,7 +101,6 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     if (flags & PAL_ZERO)
       memset (pages, 0, PGSIZE * page_cnt);
   }
-  
   else 
   {
     bool isLockAcquired = false;
@@ -121,30 +120,38 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     {
       //ASSERT (i==0);
 
-      struct frame *now = frame_find (f->phy_addr + PGSIZE * i);
+      struct frame *now = frame_find (pages + PGSIZE * i);
       
    //   printf("Before swap_out : pid->%d, addr-> %x\n", thread_current()->tid, now->phy_addr);
-      disk_sector_t disk_no = swap_out (now->phy_addr);
-      
-      struct list *l = &f->refer_pages;
-      struct list_elem *e;
+      if (now != NULL)
+      { 
+        disk_sector_t disk_no = swap_out (now->phy_addr);
+        
+        struct list *l = &now->refer_pages;
+        struct list_elem *e;
 
-      for (e = list_begin (l); e != list_end (l); e = list_next (e))
-      {
-        struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
+        for (e = list_begin (l); e != list_end (l); e = list_next (e))
+        {
+          struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
 
-        pagedir_clear_page (pp->thread->pagedir, pp->addr);
-        // TODO : swap should track all the pages indicating the disk slot
+          pagedir_clear_page (pp->thread->pagedir, pp->addr);
+          // TODO : swap should track all the pages indicating the disk slot
 
-        struct page *p = page_lookup (pp->thread, pp->addr);
-        p->disk_no = disk_no;
-        p->isDisk = true;
+          struct page *p = page_lookup (pp->thread, pp->addr);
+          p->disk_no = disk_no;
+          p->isDisk = true;
+        }
+
+        //printf("REL tid %d  release frame lock\n", thread_current()->tid);
+
+//        printf ("try to delete frame %x\n", pages+PGSIZE*i);
+        frame_delete (pages + PGSIZE * i, true);
       }
-
-      //printf("REL tid %d  release frame lock\n", thread_current()->tid);
-
-      frame_delete (f->phy_addr + PGSIZE * i, true);
     }
+    
+    if (flags & PAL_ZERO)
+      memset (pages, 0, PGSIZE * page_cnt);
+
     if (isLockAcquired == true) lock_release (&frame_lock);
   }
 
