@@ -140,6 +140,7 @@ struct file_info
 {
   struct file *file;
   bool is_mapped;
+  bool is_closed;
   int mapid;
   int mm_size;
   void *mm_addr;

@@ -37,6 +37,10 @@ bool is_valid_file (int fd)
   {
     return false;
   }
+  if (thread_current() -> files[fd]-> is_closed == true)
+  {
+    return false;
+  }
 
   return true;
 }
@@ -209,6 +213,7 @@ int syscall_open (const char *file)
       cur->files[cur->fd_idx]= palloc_get_page(0);
       cur->files[cur->fd_idx]->file = open_file;
       cur->files[cur->fd_idx]->is_mapped = false;
+      cur->files[cur->fd_idx]->is_closed = false;
       ret = cur->fd_idx++;
     }
 
@@ -222,6 +227,7 @@ int syscall_open (const char *file)
       cur->files[ret] = palloc_get_page(0);
       cur->files[ret]->file = open_file;
       cur->files[ret]->is_mapped = false;
+      cur->files[ret]->is_closed = false;
     }
   }
 
@@ -284,21 +290,23 @@ void syscall_close (int fd)
     isLockAcquired = true;
   }
 
-  if ( t->files[fd]->is_mapped )
+  if ( t->files[fd]->is_mapped == false ) 
   {
-    syscall_munmap ( t->files[fd]->mapid );
+    file_close (t->files[fd]->file);
+    t->files[fd]->file = NULL;
+
+    e->fd = fd;
+    list_push_front (&t->empty_fd_list, &e->fd_elem);
+
+    palloc_free_page(t->files[fd]);
+    t->files[fd] = NULL;
+  }
+  else 
+  {
+    t->files[fd]->is_closed = true;
   }
 
-  file_close (t->files[fd]->file);
   if ( isLockAcquired == true ) lock_release (&file_lock);
-
-  t->files[fd]->file = NULL;
-
-  e->fd = fd;
-  list_push_front (&t->empty_fd_list, &e->fd_elem);
-
-  palloc_free_page(t->files[fd]);
-  t->files[fd] = NULL;
 }
 
 int syscall_mmap (int fd, void *addr, struct intr_frame *f)
@@ -491,6 +499,12 @@ void syscall_munmap (int mapid)
 
   t->mmap_list[mapid] = 0;
   file_info->is_mapped = false;
+
+  if (file_info->is_closed == true)
+  {
+    file_info->is_mapped = false;
+    syscall_close (fd);
+  }
 
   struct empty_mmap *e2 = palloc_get_page(0);
   // XXX : maybe malloc is better than palloc

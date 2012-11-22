@@ -314,7 +314,11 @@ thread_exit (void)
   // file close
   for (i = 0; i < cur->fd_idx; i++)
   {
-    if (cur->files[i] != NULL) syscall_close(i);
+    if (cur->files[i] != NULL) 
+    {
+      if (cur->files[i]->is_mapped) syscall_munmap( cur->files[i]->mapid);
+      syscall_close(i);
+    }
   }
  
   // execute file close 
