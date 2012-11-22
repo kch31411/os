@@ -14,6 +14,7 @@ struct page  // supplement page table
   struct file *file;
   int file_start;
   int file_size;
+  bool writable;
 };
 
 unsigned page_hash (const struct hash_elem *p_, void *aux UNUSED);

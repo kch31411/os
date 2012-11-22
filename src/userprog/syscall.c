@@ -349,6 +349,7 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
     new->fromDisk = true;
     new->file = file;
     new->file_start = tmp_pos;
+    new->writable = true;
 
     if (tmp_size >= PGSIZE)
     {

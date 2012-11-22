@@ -172,8 +172,13 @@ page_fault (struct intr_frame *f)
     syscall_exit (-1);
   }
 
+  
   if (p != NULL && p->fromDisk == true)  // existing file
   {
+    if (not_present == false )
+    {
+      syscall_exit(-1);
+    }
     void *kpage;
     bool success = false;
 
@@ -184,16 +189,23 @@ page_fault (struct intr_frame *f)
 
     if (kpage != NULL)
     { 
-      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true);
+      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, p->writable);
     } 
     ASSERT (success == true);
     
-    lock_acquire(&file_lock);
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&file_lock) == false) 
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
+
     int pos = file_tell (p->file);
     file_seek( p->file, p->file_start);
     int written = file_read ( p->file, kpage, p->file_size);
     file_seek( p->file, pos);
-    lock_release(&file_lock);
+    
+    if (isLockAcquired == true) lock_release(&file_lock);
     ASSERT (p->file_size == written);
 
     p->isDisk = false;
