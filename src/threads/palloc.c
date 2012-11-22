@@ -14,6 +14,7 @@
 #include "vm/frame.h"
 #include "devices/disk.h"
 #include "vm/page.h"
+#include "userprog/syscall.h"
 
 /* Page allocator.  Hands out memory in page-size (or
    page-multiple) chunks.  See malloc.h for an allocator that
@@ -124,24 +125,44 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
       
    //   printf("Before swap_out : pid->%d, addr-> %x\n", thread_current()->tid, now->phy_addr);
       if (now != NULL)
-      { 
-        disk_sector_t disk_no = swap_out (now->phy_addr);
+      {
+        struct page_pointer *pp = list_entry (list_pop_front (&now->refer_pages), struct page_pointer, elem);
+        struct page *p = page_lookup(pp->thread, pp->addr);  // XXX : assume one refer page. otherwise set other's flag too
         
-        struct list *l = &now->refer_pages;
-        struct list_elem *e;
-
-        for (e = list_begin (l); e != list_end (l); e = list_next (e))
+        if (p->fromDisk == true)
         {
-          struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
+          if (pagedir_is_dirty(pp->thread->pagedir, pp->addr))
+          {
+            struct file *file = p->file;
+            lock_acquire (&file_lock);
+            int pos = file_tell(file);
+            int written = file_write_at (file, pages+PGSIZE*i,p->file_size, p->file_start);
+            file_seek(file, pos);
+            lock_release (&file_lock);
+            ASSERT (written == p->file_size);
+          }
 
-          pagedir_clear_page (pp->thread->pagedir, pp->addr);
-          // TODO : swap should track all the pages indicating the disk slot
-
-          struct page *p = page_lookup (pp->thread, pp->addr);
-          p->disk_no = disk_no;
-          p->isDisk = true;
+          pagedir_clear_page (pp->thread->pagedir, pg_round_down(pp->addr));
         }
+        else {
+          disk_sector_t disk_no = swap_out (now->phy_addr); 
 
+          struct list *l = &now->refer_pages;
+          struct list_elem *e;
+
+          for (e = list_begin (l); e != list_end (l); e = list_next (e))
+          {
+            struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
+
+            pagedir_clear_page (pp->thread->pagedir, pp->addr);
+            // TODO : swap should track all the pages indicating the disk slot
+
+            struct page *p = page_lookup (pp->thread, pp->addr);
+            p->disk_no = disk_no;
+            p->isDisk = true;
+          }
+        }
+       
         //printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
 //        printf ("try to delete frame %x\n", pages+PGSIZE*i);

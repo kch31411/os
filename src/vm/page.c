@@ -35,11 +35,38 @@ page_create (void *addr)
   new->addr = addr;
   new->disk_no = NULL;
   new->isDisk = false; 
+  new->fromDisk = false;
 
   hash_insert (&t->pages, &new->elem);
 
   return true;
 }
+
+struct page* 
+page_create_return (void *addr)
+{
+  struct page p;
+  struct hash_elem *e;
+  struct thread *t = thread_current ();
+  struct page *new;
+
+  p.addr = addr;
+  ASSERT (e = hash_find (&t->pages, &p.elem) == NULL);
+
+  new = malloc (sizeof (struct page));
+  if (new == NULL) return false;
+
+  new->addr = addr;
+  new->disk_no = NULL;
+  new->isDisk = false; 
+  new->fromDisk = false;
+
+  hash_insert (&t->pages, &new->elem);
+
+  return new;
+}
+
+
 
 /* Returns the page containing the given virtual address,
  *    or a null pointer if no such page exists. */

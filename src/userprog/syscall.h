@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+struct lock file_lock;
+
 void syscall_init (void);
 
 void syscall_halt (void);

@@ -8,6 +8,7 @@
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
 #include "vm/frame.h"
+#include "userprog/syscall.h"
 
 #define ABS(a) (((a) < (0))?-(a):(a))
 
@@ -171,7 +172,41 @@ page_fault (struct intr_frame *f)
     syscall_exit (-1);
   }
 
-  if (p != NULL && p->isDisk == true) // in disk
+  if (p != NULL && p->fromDisk == true)  // existing file
+  {
+    void *kpage;
+    bool success = false;
+
+    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+
+    lock_acquire (&frame_lock);
+    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
+
+    if (kpage != NULL)
+    { 
+      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true);
+    } 
+    ASSERT (success == true);
+    
+    lock_acquire(&file_lock);
+    int pos = file_tell (p->file);
+    file_seek( p->file, p->file_start);
+    int written = file_read ( p->file, kpage, p->file_size);
+    file_seek( p->file, pos);
+    lock_release(&file_lock);
+    ASSERT (p->file_size == written);
+
+    p->isDisk = false;
+    p->disk_no = NULL;
+
+    lock_release (&frame_lock);
+    //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
+
+    // TODO : instruction restart
+    return;
+
+  }
+  else if (p != NULL && p->isDisk == true) // in disk
   {
 //   printf ("case2\n");
     uint8_t *kpage;

@@ -20,7 +20,6 @@
 
 static void syscall_handler (struct intr_frame *);
 
-struct lock file_lock;
 
 bool is_valid_address (void *a)
 {
@@ -332,6 +331,29 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
     cur_addr += PGSIZE;
   }
 
+  cur_addr = addr;
+  int tmp_size = size;
+  int tmp_pos = pos;
+  for (i=0; i<page_cnt; i++)
+  {
+    struct page *new = page_create_return (cur_addr);
+    new->fromDisk = true;
+    new->file = file;
+    new->file_start = tmp_pos;
+
+    if (tmp_size >= PGSIZE)
+    {
+      tmp_size -= PGSIZE;
+      tmp_pos += PGSIZE;
+      new->file_size = PGSIZE;
+    }
+    else 
+    {
+      new->file_size = tmp_size;
+    }
+  }
+
+  /*
   // no overlapping in user virtual addr,
   // now get frames
 
@@ -355,7 +377,7 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
     cur_addr += PGSIZE;
     cur_kpage += PGSIZE;
   }
-
+*/
 
   int ret = -2;
   if (list_empty (&t->empty_mmap_list) == true)
@@ -406,6 +428,8 @@ void syscall_munmap (int mapid)
   while (size > 0)
   {
     struct page *p = page_lookup(t, addr);
+    
+    /* now no such case
     if (p->isDisk == true)
     {
       bool success = false;
@@ -431,19 +455,28 @@ void syscall_munmap (int mapid)
     {
       kpage = pagedir_get_page(t->pagedir, addr);
     }
+    */
 
-    if (pagedir_is_dirty(t->pagedir, addr))
+    kpage = pagedir_get_page(t->pagedir, addr);
+    if (kpage == NULL)
     {
-      // XXX is dirty bit reliable after swapping???
-      int written = file_write_at (file_info->file, kpage, size%PGSIZE, idx);
-      ASSERT(written == size%PGSIZE);
+      page_delete (pg_round_down (addr));
     }
+    else 
+    {
+      if (pagedir_is_dirty(t->pagedir, addr))
+      {
+        // XXX is dirty bit reliable after swapping???
+        int written = file_write_at (file_info->file, kpage, size%PGSIZE, idx);
+        ASSERT(written == size%PGSIZE);
+      }
 
-    pagedir_clear_page(t->pagedir, pg_round_down (addr));
-    page_delete (pg_round_down (addr));
+      pagedir_clear_page(t->pagedir, pg_round_down (addr));
+      page_delete (pg_round_down (addr));
 
-    // XXX: can always delete???
-    frame_delete (kpage, true);
+      // XXX: can always delete???
+      frame_delete (kpage, true);
+    }
 
     size -= size % PGSIZE;
     idx = idx + PGSIZE;

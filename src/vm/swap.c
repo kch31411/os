@@ -56,7 +56,7 @@ swap_out (void* phy_addr)
 
   lock_release (&swap_lock);
   //    printf("REL tid %d  release swap lock\n", thread_current()->tid);
-
+  
   return ret;
 }
 
