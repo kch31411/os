@@ -391,7 +391,8 @@ thread_exit (void)
 
     else
     {
-      frame_delete (pagedir_get_page (cur->pagedir, p->addr), false);
+      void *tmp = pagedir_get_page(cur->pagedir, p->addr);
+      if (tmp != NULL)  frame_delete (tmp, false);
     }
 
     tmp[tmp_idx++] = p->addr;

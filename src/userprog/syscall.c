@@ -313,6 +313,7 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
   struct file *file = t->files[fd]->file;
 
   int size = syscall_filesize(fd);
+  
   int page_cnt = size / PGSIZE;
   if (size % PGSIZE != 0) page_cnt += 1;
 
@@ -351,6 +352,8 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
     {
       new->file_size = tmp_size;
     }
+
+    cur_addr += PGSIZE;
   }
 
   /*
@@ -478,8 +481,9 @@ void syscall_munmap (int mapid)
       frame_delete (kpage, true);
     }
 
-    size -= size % PGSIZE;
+    size -= size;
     idx = idx + PGSIZE;
+    addr += PGSIZE;
   }
 
   file_seek( file_info->file, pos);
