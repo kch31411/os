@@ -214,6 +214,7 @@ int syscall_open (const char *file)
       cur->files[cur->fd_idx]->file = open_file;
       cur->files[cur->fd_idx]->is_mapped = false;
       cur->files[cur->fd_idx]->is_closed = false;
+
       ret = cur->fd_idx++;
     }
 
@@ -290,7 +291,7 @@ void syscall_close (int fd)
     isLockAcquired = true;
   }
 
-  if ( t->files[fd]->is_mapped == false ) 
+  if (t->files[fd]->is_mapped == false) 
   {
     file_close (t->files[fd]->file);
     t->files[fd]->file = NULL;
@@ -298,9 +299,10 @@ void syscall_close (int fd)
     e->fd = fd;
     list_push_front (&t->empty_fd_list, &e->fd_elem);
 
-    palloc_free_page(t->files[fd]);
+    palloc_free_page (t->files[fd]);
     t->files[fd] = NULL;
   }
+
   else 
   {
     t->files[fd]->is_closed = true;
@@ -357,6 +359,7 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
       tmp_pos += PGSIZE;
       new->file_size = PGSIZE;
     }
+    
     else 
     {
       new->file_size = tmp_size;
@@ -419,6 +422,7 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
 
   return ret;
 }
+
 void syscall_munmap (int mapid)
 {
   struct thread *t = thread_current();
@@ -503,7 +507,6 @@ void syscall_munmap (int mapid)
 
   if (file_info->is_closed == true)
   {
-    file_info->is_mapped = false;
     syscall_close (fd);
   }
 

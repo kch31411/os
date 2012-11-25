@@ -316,8 +316,8 @@ thread_exit (void)
   {
     if (cur->files[i] != NULL) 
     {
-      if (cur->files[i]->is_mapped) syscall_munmap( cur->files[i]->mapid);
-      syscall_close(i);
+      file_close (cur->files[i]->file);
+      if (cur->files[i]->is_mapped) syscall_munmap (cur->files[i]->mapid);
     }
   }
  
