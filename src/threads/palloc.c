@@ -126,16 +126,19 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
    //   printf("Before swap_out : pid->%d, addr-> %x\n", thread_current()->tid, now->phy_addr);
       if (now != NULL)
       {
-        struct page_pointer *pp = list_entry (list_pop_front (&now->refer_pages), struct page_pointer, elem);
-        struct page *p = page_lookup(pp->thread, pp->addr);  // XXX : assume one refer page. otherwise set other's flag too
+        struct page_pointer *pp = list_entry (list_front (&now->refer_pages), struct page_pointer, elem);
+        struct page *p = page_lookup (pp->thread, pp->addr);  // XXX : assume one refer page. otherwise set other's flag too
         
         if (p->fromDisk == true)
         {
-          if (pagedir_is_dirty(pp->thread->pagedir, pp->addr))
+
+          if (pagedir_is_dirty (pp->thread->pagedir, pp->addr))
           {
+            printf ("fault : %x\n", pp->addr);
+            ASSERT (false);
             struct file *file = p->file;
             lock_acquire (&file_lock);
-            int pos = file_tell(file);
+            int pos = file_tell (file);
             int written = file_write_at (file, pages+PGSIZE*i,p->file_size, p->file_start);
             file_seek(file, pos);
             lock_release (&file_lock);
@@ -144,7 +147,9 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
 
           pagedir_clear_page (pp->thread->pagedir, pg_round_down(pp->addr));
         }
-        else {
+
+        else 
+        {
           disk_sector_t disk_no = swap_out (now->phy_addr); 
 
           struct list *l = &now->refer_pages;

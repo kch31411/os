@@ -171,27 +171,30 @@ page_fault (struct intr_frame *f)
  //   printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
     syscall_exit (-1);
   }
-
   
   if (p != NULL && p->fromDisk == true)  // existing file
   {
-    if (not_present == false )
+    //printf("fault : %x not_p:%d, write:%d, user:%d\n", fault_addr, not_present, write, user);
+
+    if (not_present == false && write == true && user == true)
     {
-      syscall_exit(-1);
+      ASSERT(false);
+      syscall_exit (-1);
+      return;
     }
     void *kpage;
     bool success = false;
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
-    lock_acquire (&frame_lock);
-    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
-
     if (kpage != NULL)
     { 
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, p->writable);
     } 
     ASSERT (success == true);
+
+    lock_acquire (&frame_lock);
+    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
     
     bool isLockAcquired = false;
     if (lock_held_by_current_thread (&file_lock) == false) 
@@ -202,22 +205,22 @@ page_fault (struct intr_frame *f)
 
     int pos = file_tell (p->file);
     file_seek( p->file, p->file_start);
-    int written = file_read ( p->file, kpage, p->file_size);
+    int written = file_read (p->file, kpage, p->file_size);
     file_seek( p->file, pos);
     
     if (isLockAcquired == true) lock_release(&file_lock);
     ASSERT (p->file_size == written);
 
-    p->isDisk = false;
-    p->disk_no = NULL;
+    pagedir_set_dirty(thread_current()->pagedir, pg_round_down(fault_addr), false);
+    //printf("is dirty? : %d\n", pagedir_is_dirty (thread_current()->pagedir, pg_round_down(fault_addr)));
 
     lock_release (&frame_lock);
     //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
     // TODO : instruction restart
     return;
-
   }
+
   else if (p != NULL && p->isDisk == true) // in disk
   {
 //   printf ("case2\n");

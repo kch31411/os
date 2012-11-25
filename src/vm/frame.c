@@ -130,7 +130,6 @@ frame_delete (void *phy_addr, bool isForce)
       }
     }
   }
-
   
   if (isForce == true || list_size (l) == 0) 
   {

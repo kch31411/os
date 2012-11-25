@@ -518,27 +518,54 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
   int tmp_pos = ofs;
   while (read_bytes > 0 || zero_bytes > 0) 
-    {
+  {
       /* Do calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      struct page *new = page_create_return (upage);
-      new->fromDisk = true;
-      new->file = file;
-      new->file_start = tmp_pos;
-      new->file_size = page_read_bytes;
-      new->writable = writable;
+      if (writable == false) 
+      {
+        struct page *new = page_create_return (upage);
 
+        new->fromDisk = true;
+        new->file = file;
+        new->file_start = tmp_pos;
+        new->file_size = page_read_bytes;
+        new->writable = writable;
+      }
+
+      else
+      {
+        uint8_t *kpage = palloc_get_page (PAL_USER);
+        if (kpage == NULL)
+          return false;
+
+        /* Load this page. */
+        file_seek (file, tmp_pos);
+        if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          palloc_free_page (kpage);
+          return false; 
+        }
+        memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+        /* Add the page to the process's address space. */
+        if (!install_page (upage, kpage, writable)) 
+        {
+          palloc_free_page (kpage);
+          return false; 
+        }
+      }
 
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
       tmp_pos += PGSIZE;
-    }
+  }
+
   return true;
 }
 

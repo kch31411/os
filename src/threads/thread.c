@@ -348,8 +348,8 @@ thread_exit (void)
     struct empty_mmap *ef = list_entry (list_pop_front (&cur->empty_mmap_list), struct empty_mmap, mmap_elem);
     palloc_free_page (ef);
   }
+  
   // pages & frames & swap slots
-
   /*
   printf ("size:%d\n", hash_size (&cur->pages));
   hash_first (&it, &cur->pages);
@@ -386,6 +386,7 @@ thread_exit (void)
   while (hash_cur (&it) != NULL)
   {
     struct page *p = hash_entry (hash_cur (&it), struct page, elem);
+    void *kpage = pagedir_get_page (cur->pagedir, p->addr);
     hash_next (&it);
 
     if (p->isDisk == true)
@@ -395,8 +396,7 @@ thread_exit (void)
 
     else
     {
-      void *tmp = pagedir_get_page(cur->pagedir, p->addr);
-      if (tmp != NULL)  frame_delete (tmp, false);
+      if (kpage != NULL) frame_delete (kpage, false);
     }
 
     tmp[tmp_idx++] = p->addr;

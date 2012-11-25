@@ -54,7 +54,7 @@ page_create_return (void *addr)
   ASSERT (e = hash_find (&t->pages, &p.elem) == NULL);
 
   new = malloc (sizeof (struct page));
-  if (new == NULL) return false;
+  if (new == NULL) return NULL;
 
   new->addr = addr;
   new->disk_no = NULL;
@@ -65,8 +65,6 @@ page_create_return (void *addr)
 
   return new;
 }
-
-
 
 /* Returns the page containing the given virtual address,
  *    or a null pointer if no such page exists. */
