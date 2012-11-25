@@ -134,8 +134,6 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
 
           if (pagedir_is_dirty (pp->thread->pagedir, pp->addr))
           {
-            printf ("fault : %x\n", pp->addr);
-            ASSERT (false);
             struct file *file = p->file;
             lock_acquire (&file_lock);
             int pos = file_tell (file);

@@ -282,18 +282,20 @@ void syscall_close (int fd)
   struct thread *t = thread_current();
   ASSERT (e != NULL);
 
-  if (is_valid_file (fd) == false) return;
-
-  bool isLockAcquired = false;
-  if (lock_held_by_current_thread (&file_lock) == false) 
-  {
-    lock_acquire (&file_lock);
-    isLockAcquired = true;
-  }
+  if (is_valid_file (fd) == false) return; 
 
   if (t->files[fd]->is_mapped == false) 
   {
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&file_lock) == false) 
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
+
     file_close (t->files[fd]->file);
+    if ( isLockAcquired == true ) lock_release (&file_lock);
+    
     t->files[fd]->file = NULL;
 
     e->fd = fd;
@@ -308,7 +310,6 @@ void syscall_close (int fd)
     t->files[fd]->is_closed = true;
   }
 
-  if ( isLockAcquired == true ) lock_release (&file_lock);
 }
 
 int syscall_mmap (int fd, void *addr, struct intr_frame *f)
@@ -439,6 +440,7 @@ void syscall_munmap (int mapid)
     isLockAcquired = true;
   }
   off_t pos = file_tell(file_info->file);
+  if ( isLockAcquired == true ) lock_release (&file_lock);
 
   int idx = 0;
   while (size > 0)
@@ -483,7 +485,15 @@ void syscall_munmap (int mapid)
       if (pagedir_is_dirty(t->pagedir, addr))
       {
         // XXX is dirty bit reliable after swapping???
+        isLockAcquired = false;
+        if (lock_held_by_current_thread (&file_lock) == false) 
+        {
+          lock_acquire (&file_lock);
+          isLockAcquired = true;
+        }
+
         int written = file_write_at (file_info->file, kpage, size%PGSIZE, idx);
+        if ( isLockAcquired == true ) lock_release (&file_lock);
         ASSERT(written == size%PGSIZE);
       }
 
@@ -497,6 +507,12 @@ void syscall_munmap (int mapid)
     size -= size;
     idx = idx + PGSIZE;
     addr += PGSIZE;
+  }
+  isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false) 
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
   }
 
   file_seek( file_info->file, pos);
