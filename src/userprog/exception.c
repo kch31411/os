@@ -174,11 +174,10 @@ page_fault (struct intr_frame *f)
   
   if (p != NULL && p->fromDisk == true)  // existing file
   {
-    //printf("fault : %x not_p:%d, write:%d, user:%d\n", fault_addr, not_present, write, user);
+   // printf("fault : %x not_p:%d, write:%d, user:%d\n", fault_addr, not_present, write, user);
 
-    if (not_present == false && write == true && user == true)
+    if (not_present == false )
     {
-      ASSERT(false);
       syscall_exit (-1);
       return;
     }

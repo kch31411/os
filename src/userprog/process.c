@@ -543,8 +543,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           return false;
 
         /* Load this page. */
-        file_seek (file, tmp_pos);
-        if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        if (file_read_at (file, kpage, page_read_bytes, tmp_pos) != (int) page_read_bytes)
         {
           palloc_free_page (kpage);
           return false; 
