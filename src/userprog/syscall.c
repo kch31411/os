@@ -14,12 +14,11 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 
-
 #define ARG(x) (f->esp+(4*x))
 #define MAX_CONSOLE_WRITE 400
+#define MIN(a, b) (((a) < (b))? (a): (b))
 
 static void syscall_handler (struct intr_frame *);
-
 
 bool is_valid_address (void *a)
 {
@@ -294,9 +293,7 @@ void syscall_close (int fd)
     }
 
     file_close (t->files[fd]->file);
-    if ( isLockAcquired == true ) lock_release (&file_lock);
-    
-    t->files[fd]->file = NULL;
+    if (isLockAcquired == true) lock_release (&file_lock);
 
     e->fd = fd;
     list_push_front (&t->empty_fd_list, &e->fd_elem);
@@ -309,17 +306,16 @@ void syscall_close (int fd)
   {
     t->files[fd]->is_closed = true;
   }
-
 }
 
-int syscall_mmap (int fd, void *addr, struct intr_frame *f)
+int syscall_mmap (int fd, void *addr)
 {
-  if (is_valid_file(fd) == false) return -1;
-  if ( pg_ofs (addr) != 0 || is_valid_address(addr) == false || 
-      addr > f->esp || addr < 0x08048000) return -1;
-  // addr in code, stack??? page already exist.
-  // anyway can save the start position of code segment when load is done 
-  
+  printf ("mmap with %d\n", thread_current()->tid);
+
+  if (is_valid_file (fd) == false) return -1;
+
+  if (pg_ofs (addr) != 0 || is_valid_address(addr) == false || addr < 0x08048000) return -1;
+
   struct thread *t = thread_current();
   struct file *file = t->files[fd]->file;
 
@@ -334,11 +330,10 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
 
   int i;
   void *cur_addr = addr;
-  for (i=0; i<page_cnt; i++)
+  for (i = 0; i < page_cnt; i++)
   {
-    if (pagedir_get_page(t->pagedir, cur_addr) != NULL) return -1;
-    if (page_lookup(t, cur_addr) != NULL ) return -1;
-      // XXX : is it enought???
+    if (pagedir_get_page (t->pagedir, cur_addr) != NULL) return -1;
+    if (page_lookup (t, cur_addr) != NULL) return -1;
 
     cur_addr += PGSIZE;
   }
@@ -346,9 +341,12 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
   cur_addr = addr;
   int tmp_size = size;
   int tmp_pos = pos;
-  for (i=0; i<page_cnt; i++)
+  for (i = 0; i < page_cnt; i++)
   {
-    struct page *new = page_create_return (cur_addr);
+    struct page *new;
+    page_create (cur_addr);
+    new = page_lookup (t, cur_addr);
+
     new->fromDisk = true;
     new->file = file;
     new->file_start = tmp_pos;
@@ -368,39 +366,14 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
 
     cur_addr += PGSIZE;
   }
-
-  /*
-  // no overlapping in user virtual addr,
-  // now get frames
-
-  // XXX : synch problem
-  void *kpage = palloc_get_multiple (PAL_USER | PAL_ZERO, page_cnt);
-  lock_acquire(&file_lock);
-  int written = file_read ( file, kpage, size);
-  lock_release(&file_lock);
-  ASSERT (size == written);
-
-//  printf("upage : %x,  kpage : %x\n", addr, kpage);
-
-  cur_addr = addr;
-  void *cur_kpage = kpage;
-  for(i=0; i<page_cnt; i++)
-  {
-    // XXX: sync problem?
-    pagedir_set_page ( t->pagedir, cur_addr, cur_kpage, true);
-    page_create (cur_addr);
-
-    cur_addr += PGSIZE;
-    cur_kpage += PGSIZE;
-  }
-*/
-
-  int ret = -2;
+  
+  int ret = -1;
   if (list_empty (&t->empty_mmap_list) == true)
   {
     t->mmap_list[t->mmap_idx] = fd;
     ret = t->mmap_idx++;
   }
+
   else
   {
     struct empty_mmap *e = list_entry (list_pop_front (&t->empty_mmap_list), struct empty_mmap, mmap_elem);
@@ -415,18 +388,19 @@ int syscall_mmap (int fd, void *addr, struct intr_frame *f)
   file_seek (file, pos);
   lock_release(&file_lock);
 
-
   t->files[fd]->is_mapped = true;
   t->files[fd]->mapid = ret;
-  t->files[fd]->mm_size = size; // XXX: file size can varies hmm...
+  t->files[fd]->mm_size = size; 
   t->files[fd]->mm_addr = addr;
 
+  printf ("mmap complete with %d\n",thread_current()->tid);
   return ret;
 }
 
 void syscall_munmap (int mapid)
 {
-  struct thread *t = thread_current();
+  printf ("unmap with id %d\n",thread_current()->tid );
+  struct thread *t = thread_current ();
   int fd = t->mmap_list[mapid];
   struct file_info *file_info = t->files[fd];
   int size = file_info->mm_size;
@@ -439,52 +413,24 @@ void syscall_munmap (int mapid)
     lock_acquire (&file_lock);
     isLockAcquired = true;
   }
-  off_t pos = file_tell(file_info->file);
-  if ( isLockAcquired == true ) lock_release (&file_lock);
+  off_t pos = file_tell (file_info->file);
+  if (isLockAcquired == true) lock_release (&file_lock);
 
   int idx = 0;
   while (size > 0)
   {
     struct page *p = page_lookup(t, addr);
-    
-    /* now no such case
-    if (p->isDisk == true)
-    {
-      bool success = false;
-
-      kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-
-      lock_acquire (&frame_lock);
-
-      if (kpage != NULL)
-      { 
-        success = pagedir_set_page (t->pagedir, pg_round_down (addr), kpage, true);
-      } 
-      ASSERT (success == true);
-
-      swap_in (p->disk_no, kpage);
-
-      p->isDisk = false;
-      p->disk_no = NULL;
-
-      lock_release (&frame_lock);
-    }
-    else
-    {
-      kpage = pagedir_get_page(t->pagedir, addr);
-    }
-    */
 
     kpage = pagedir_get_page(t->pagedir, addr);
     if (kpage == NULL)
     {
       page_delete (pg_round_down (addr));
     }
+
     else 
     {
       if (pagedir_is_dirty(t->pagedir, addr))
       {
-        // XXX is dirty bit reliable after swapping???
         isLockAcquired = false;
         if (lock_held_by_current_thread (&file_lock) == false) 
         {
@@ -492,22 +438,22 @@ void syscall_munmap (int mapid)
           isLockAcquired = true;
         }
 
-        int written = file_write_at (file_info->file, kpage, size%PGSIZE, idx);
-        if ( isLockAcquired == true ) lock_release (&file_lock);
-        ASSERT(written == size%PGSIZE);
+        int written = file_write_at (file_info->file, kpage, MIN(size, PGSIZE), idx);
+        if (isLockAcquired == true) lock_release (&file_lock);
+        ASSERT(written == MIN(size, PGSIZE));
       }
 
       pagedir_clear_page(t->pagedir, pg_round_down (addr));
       page_delete (pg_round_down (addr));
 
-      // XXX: can always delete???
       frame_delete (kpage, true);
     }
 
-    size -= size;
+    size -= PGSIZE;
     idx = idx + PGSIZE;
     addr += PGSIZE;
   }
+
   isLockAcquired = false;
   if (lock_held_by_current_thread (&file_lock) == false) 
   {
@@ -526,11 +472,12 @@ void syscall_munmap (int mapid)
     syscall_close (fd);
   }
 
-  struct empty_mmap *e2 = palloc_get_page(0);
-  // XXX : maybe malloc is better than palloc
+  struct empty_mmap *em = palloc_get_page(0);
 
-  e2->mapid = t->files[fd]->mapid;
-  list_push_front (&t->empty_mmap_list, &e2->mmap_elem);
+  em->mapid = t->files[fd]->mapid;
+  list_push_front (&t->empty_mmap_list, &em->mmap_elem);
+
+  printf ("unmap complete with id %d\n", thread_current()->tid);
 }
 
 static void
@@ -553,7 +500,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_SEEK: syscall_seek (arg_get(ARG(1)), arg_get(ARG(2))); break;
     case SYS_TELL: f->eax = syscall_tell (arg_get(ARG(1))); break;
     case SYS_CLOSE: syscall_close (arg_get(ARG(1))); break;
-    case SYS_MMAP: f->eax = syscall_mmap (arg_get(ARG(1)), arg_get(ARG(2)), f); break;
+    case SYS_MMAP: f->eax = syscall_mmap (arg_get(ARG(1)), arg_get(ARG(2))); break;
     case SYS_MUNMAP: syscall_munmap (arg_get(ARG(1))); break;
     default: ASSERT(false); break;
   } 
