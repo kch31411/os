@@ -351,11 +351,11 @@ thread_exit (void)
     struct empty_mmap *ef = list_entry (list_pop_front (&cur->empty_mmap_list), struct empty_mmap, mmap_elem);
     palloc_free_page (ef);
   }
-
+/*
   if (lock_held_by_current_thread (&file_lock)) {
     lock_release(&file_lock);
   }
-
+*/
 //  printf ("th exit 1\n");
 
   int tmp[hash_size (&cur->pages)];

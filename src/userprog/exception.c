@@ -168,13 +168,6 @@ page_fault (struct intr_frame *f)
     syscall_exit (-1);
   }
 
-  bool isFileLockAcquired = false;
-  if (lock_held_by_current_thread (&file_lock)) 
-  {
-    lock_release (&file_lock);
-    isFileLockAcquired = true;
-  }
-
   if (p != NULL && p->fromDisk == true) // loaded from hard disk (lazy loading) 
   {
     //printf("fromDisk\n");
@@ -198,13 +191,18 @@ page_fault (struct intr_frame *f)
     } 
     ASSERT (success == true);
 
-    
-    lock_acquire (&file_lock);
+
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&file_lock)==false) 
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
     int pos = file_tell (p->file);
     file_seek( p->file, p->file_start);
     int written = file_read (p->file, kpage, p->file_size);
     file_seek( p->file, pos);
-    lock_release(&file_lock);
+    if (isLockAcquired) lock_release(&file_lock);
 
     ASSERT (p->file_size == written);
 
@@ -212,8 +210,6 @@ page_fault (struct intr_frame *f)
 
 //    printf("REL tid %d frame lock\n", thread_current()->tid);
     lock_release (&frame_lock);
-
-    if (isFileLockAcquired) lock_acquire (&file_lock);
 
     return;
   }
@@ -245,9 +241,6 @@ page_fault (struct intr_frame *f)
 //    printf("REL tid %d frame lock\n", thread_current()->tid);
     lock_release (&frame_lock);
     
-    if (isFileLockAcquired) lock_acquire (&file_lock);
-
-
     return;
   }
 
@@ -270,13 +263,11 @@ page_fault (struct intr_frame *f)
 //    printf("REL tid %d frame lock\n", thread_current()->tid);
     lock_release (&frame_lock);
 
-    if (isFileLockAcquired) lock_acquire (&file_lock);
     return;
   }
 
   else
   {
-    if (isFileLockAcquired) lock_acquire (&file_lock);
     //printf ("jinjjada\n");
     syscall_exit (-1);
   }
