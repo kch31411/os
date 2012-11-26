@@ -302,10 +302,13 @@ thread_exit (void)
   dc->tid = cur->tid;
   dc->exit_status = cur->exit_status;
   
+//  printf ("thread exit: %d\n", cur->tid);
+  
   if ( &cur->child_elem != NULL && (&cur->child_elem)->prev != NULL && (&cur->child_elem)->next != NULL )
   {
     list_remove(&cur->child_elem);
   }
+
   if (cur->parent != NULL && cur->load_success == true)
   {
     list_push_back (&cur->parent->dead_list, &dc->child_elem);
@@ -348,33 +351,16 @@ thread_exit (void)
     struct empty_mmap *ef = list_entry (list_pop_front (&cur->empty_mmap_list), struct empty_mmap, mmap_elem);
     palloc_free_page (ef);
   }
-  
-  // pages & frames & swap slots
-  /*
-  printf ("size:%d\n", hash_size (&cur->pages));
-  hash_first (&it, &cur->pages);
-  while (hash_next (&it) != NULL)
-  {
-    struct page *p = hash_entry (hash_cur (&it), struct page, elem);
-    printf ("page %d-%x\n", p->isDisk, p->addr);
+
+  if (lock_held_by_current_thread (&file_lock)) {
+    lock_release(&file_lock);
   }
 
-  printf ("size F:%d\n", hash_size (&frames));
-  hash_first (&it, &frames);
-  while (hash_next (&it) != NULL)
-  {
-    struct frame *p = hash_entry (hash_cur (&it), struct frame, elem);
-    printf ("frame %x\n", p->phy_addr);
-  }
-  */
+//  printf ("th exit 1\n");
+
   int tmp[hash_size (&cur->pages)];
   int tmp_idx = 0;
- 
-  hash_first (&it, &cur->pages);
-  hash_next (&it);
-
   bool isLockAcquired = false;
-
   if (lock_held_by_current_thread (&frame_lock) == false)
   {
     lock_acquire (&frame_lock);
@@ -382,7 +368,9 @@ thread_exit (void)
   }
 
   lock_acquire (&swap_lock);
-  //    printf("ACQ tid %d  acquire swap lock\n", thread_current()->tid);
+  hash_first (&it, &cur->pages);
+  hash_next (&it);
+
   while (hash_cur (&it) != NULL)
   {
     struct page *p = hash_entry (hash_cur (&it), struct page, elem);
@@ -409,8 +397,9 @@ thread_exit (void)
   
   lock_release (&swap_lock);
   if (isLockAcquired == true) lock_release (&frame_lock);
-   //   printf("REL tid %d  release swap lock\n", thread_current()->tid);
 
+ // printf ("th exit 2");
+    
   hash_destroy(&cur->pages, NULL);
 
 #ifdef USERPROG

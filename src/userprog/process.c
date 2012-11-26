@@ -527,7 +527,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       if (writable == false) 
       {
-        struct page *new = page_create_return (upage);
+        struct page *new;
+        page_create (upage);
+        new = page_lookup (thread_current (), upage);
 
         new->fromDisk = true;
         new->file = file;

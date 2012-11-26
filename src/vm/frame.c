@@ -34,8 +34,6 @@ frame_create (void* phy_addr, void* page_addr)
   struct hash_elem *e;
   struct page_pointer *pp;
 
-//  printf("try to CREAT frame %x\n", phy_addr);
-
   pp = malloc (sizeof (struct page_pointer));
   pp->thread = thread_current ();
   pp->addr = page_addr;
@@ -44,11 +42,7 @@ frame_create (void* phy_addr, void* page_addr)
 
   if (e = hash_find (&frames, &f.elem) != NULL)
   {
-    printf ("phy add:%x, vir addr:%x\n", phy_addr, page_addr);
-
-//    ASSERT (false);
     struct frame *fr = hash_entry (e, struct frame, elem);
-
     list_push_back (&fr->refer_pages, &pp->elem);
   }
 
@@ -59,7 +53,6 @@ frame_create (void* phy_addr, void* page_addr)
     fr->phy_addr = phy_addr;
 
     list_init (&fr->refer_pages);
-    //lock_init (&fr->lock);
     list_push_back (&fr->refer_pages, &pp->elem);
 
     hash_insert (&frames, &fr->elem);
@@ -88,7 +81,6 @@ frame_delete (void *phy_addr, bool isForce)
     lock_acquire (&frame_lock);
     isLockAcquired = true;
   }
-  //  printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
   
   struct frame f;
   struct frame *fr;
@@ -100,7 +92,6 @@ frame_delete (void *phy_addr, bool isForce)
 
   eh = hash_find (&frames, &f.elem);
 
-//  if (eh == NULL) return;
   ASSERT (eh != NULL);
 
   fr = hash_entry (eh, struct frame, elem);
@@ -139,7 +130,6 @@ frame_delete (void *phy_addr, bool isForce)
   }
 
   if (isLockAcquired == true) lock_release (&frame_lock);
-  //    printf("REL tid %d  release frame lock\n", thread_current()->tid);
 }
 
 bool
@@ -210,7 +200,6 @@ frame_victim ()
 
     if (frame_is_accessed (f) == false)
     {
-      //printf("victim addr : %x\n", f->phy_addr);
        return f;
     }
 

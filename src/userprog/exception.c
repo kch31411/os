@@ -160,24 +160,27 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
 
   struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
-//  struct page *stack_page = page_lookup (thread_current (), pg_round_down (f->esp));
 
-//  printf ("EIP:%x\n", f->eip);
-//  printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
+//  printf ("Page fault occured %x, not_p:%d, write:%d, user:%d, page:%x, fromHard:%d, Swapped:%d Writable:%d \n", fault_addr, not_present, write, user, p, p->fromDisk, p->isDisk, p->writable);
 
-  if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)// || is_user_vaddr (f->esp) == false)
+  if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)
   {
- //   printf ("case1\n");
- //   printf ("isuser: %d, ADDR: %x, ESP: %x, lookup above : %x\n", is_user_vaddr(fault_addr), fault_addr, f->esp, page_lookup (thread_current (), pg_round_up (fault_addr)));
     syscall_exit (-1);
   }
-  
-  if (p != NULL && p->fromDisk == true)  // existing file
-  {
-   // printf("fault : %x not_p:%d, write:%d, user:%d\n", fault_addr, not_present, write, user);
 
-    if (not_present == false )
+  bool isFileLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock)) 
+  {
+    lock_release (&file_lock);
+    isFileLockAcquired = true;
+  }
+
+  if (p != NULL && p->fromDisk == true) // loaded from hard disk (lazy loading) 
+  {
+    //printf("fromDisk\n");
+    if (not_present == false)
     {
+     // printf ("yogida\n");
       syscall_exit (-1);
       return;
     }
@@ -186,54 +189,51 @@ page_fault (struct intr_frame *f)
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
+//    printf("ACQ tid %d frame lock\n", thread_current()->tid);
+    lock_acquire (&frame_lock);
+
     if (kpage != NULL)
     { 
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, p->writable);
     } 
     ASSERT (success == true);
 
-    lock_acquire (&frame_lock);
-    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
     
-    bool isLockAcquired = false;
-    if (lock_held_by_current_thread (&file_lock) == false) 
-    {
-      lock_acquire (&file_lock);
-      isLockAcquired = true;
-    }
-
+    lock_acquire (&file_lock);
     int pos = file_tell (p->file);
     file_seek( p->file, p->file_start);
     int written = file_read (p->file, kpage, p->file_size);
     file_seek( p->file, pos);
-    
-    if (isLockAcquired == true) lock_release(&file_lock);
+    lock_release(&file_lock);
+
     ASSERT (p->file_size == written);
 
     pagedir_set_dirty(thread_current()->pagedir, pg_round_down(fault_addr), false);
-    //printf("is dirty? : %d\n", pagedir_is_dirty (thread_current()->pagedir, pg_round_down(fault_addr)));
 
+//    printf("REL tid %d frame lock\n", thread_current()->tid);
     lock_release (&frame_lock);
-    //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
-    // TODO : instruction restart
+    if (isFileLockAcquired) lock_acquire (&file_lock);
+
     return;
   }
 
-  else if (p != NULL && p->isDisk == true) // in disk
+  else if (p != NULL && p->isDisk == true) // swapped out
   {
-//   printf ("case2\n");
+    //printf("swapped");
+
     uint8_t *kpage;
     bool success = false;
 
+//    printf("ACQ tid %d frame lock\n", thread_current()->tid);
+    lock_acquire (&frame_lock);
+
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   
-    lock_acquire (&frame_lock);
-    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
 
     if (kpage != NULL)
     { 
-      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, true);
+      success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, p->writable);
     } 
     ASSERT (success == true);
 
@@ -242,24 +242,23 @@ page_fault (struct intr_frame *f)
     p->isDisk = false;
     p->disk_no = NULL;
 
+//    printf("REL tid %d frame lock\n", thread_current()->tid);
     lock_release (&frame_lock);
-    //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
+    
+    if (isFileLockAcquired) lock_acquire (&file_lock);
 
-    // TODO : instruction restart
+
     return;
   }
 
-  else if (p == NULL && (f->esp < fault_addr || ABS(f->esp - fault_addr) <= 32) && fault_addr > PHYS_BASE - 0x800000)
+  else if (p == NULL && (f->esp < fault_addr || ABS(f->esp - fault_addr) <= 32) && fault_addr > PHYS_BASE - 0x800000) // stack growth
   {
- //   printf ("case3\n");
-
     uint8_t *kpage;
     bool success = false;
 
+ //   printf("ACQ tid %d frame lock\n", thread_current()->tid);
     lock_acquire (&frame_lock);
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-
-    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
 
     if (kpage != NULL)
     {
@@ -268,18 +267,18 @@ page_fault (struct intr_frame *f)
 
     ASSERT (success == true);
 
+//    printf("REL tid %d frame lock\n", thread_current()->tid);
     lock_release (&frame_lock);
-    //  printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
+    if (isFileLockAcquired) lock_acquire (&file_lock);
     return;
   }
 
   else
   {
-  //    printf ("case4\n");
- //   printf ("FOR DEBUG : page fault , will exit(-1)");
+    if (isFileLockAcquired) lock_acquire (&file_lock);
+    //printf ("jinjjada\n");
     syscall_exit (-1);
-//    thread_exit ();
   }
 
   printf ("Page fault at %p: %s error %s page in %s context.\n",

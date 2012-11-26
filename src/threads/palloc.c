@@ -104,34 +104,30 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   }
   else 
   {
+//    printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
+    
     bool isLockAcquired = false;
     if (lock_held_by_current_thread (&frame_lock) == false) 
     {
       lock_acquire (&frame_lock);
       isLockAcquired = true;
     }
-    //printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
 
     struct frame *f = frame_victim ();
     int i;
 
-  //  printf("swap out : pid->%d f-> %x, addr ->%x\n", thread_current()->tid, f, f->phy_addr);
     pages = f->phy_addr;
     for (i = 0; i < page_cnt; i++)
     {
-      //ASSERT (i==0);
-
       struct frame *now = frame_find (pages + PGSIZE * i);
       
-   //   printf("Before swap_out : pid->%d, addr-> %x\n", thread_current()->tid, now->phy_addr);
       if (now != NULL)
       {
         struct page_pointer *pp = list_entry (list_front (&now->refer_pages), struct page_pointer, elem);
-        struct page *p = page_lookup (pp->thread, pp->addr);  // XXX : assume one refer page. otherwise set other's flag too
-        
+        struct page *p = page_lookup (pp->thread, pp->addr);  
+
         if (p->fromDisk == true)
         {
-
           if (pagedir_is_dirty (pp->thread->pagedir, pp->addr))
           {
             struct file *file = p->file;
@@ -165,17 +161,17 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
             p->isDisk = true;
           }
         }
-       
-        //printf("REL tid %d  release frame lock\n", thread_current()->tid);
 
-//        printf ("try to delete frame %x\n", pages+PGSIZE*i);
         frame_delete (pages + PGSIZE * i, true);
       }
     }
     
     if (flags & PAL_ZERO)
+    {
       memset (pages, 0, PGSIZE * page_cnt);
+    }
 
+//    printf("REL tid %d  release frame lock\n", thread_current()->tid);
     if (isLockAcquired == true) lock_release (&frame_lock);
   }
 

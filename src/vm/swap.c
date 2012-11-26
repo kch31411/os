@@ -15,10 +15,8 @@ disk_sector_t
 swap_get_slot (void)
 {
   lock_acquire (&swap_bitmap_lock);
-  //    printf("ACQ tid %d  acquire swap bitmap lock\n", thread_current()->tid);
   disk_sector_t ret = bitmap_scan_and_flip (swap_slot, 0, SEC_PER_PG, false);
   lock_release (&swap_bitmap_lock);
-  //    printf("REL tid %d  release swap bitmap lock\n", thread_current()->tid);
 
   return ret;
 }
@@ -27,19 +25,15 @@ void
 swap_free_slot (disk_sector_t d)
 {
   lock_acquire (&swap_bitmap_lock);
-  //    printf("ACQ tid %d  acquire swap bitmap lock\n", thread_current()->tid);
   bitmap_set_multiple (swap_slot, (size_t)d, SEC_PER_PG, false);
   lock_release (&swap_bitmap_lock);
-  //    printf("REL tid %d  release swap bitmap lock\n", thread_current()->tid);
 }
 
 disk_sector_t
 swap_out (void* phy_addr)
 {
- // printf("IN swap : %x\n", phy_addr);
   ASSERT (pg_ofs (phy_addr) == 0);
   lock_acquire (&swap_lock);
-  //    printf("ACQ tid %d  acquire swap lock\n", thread_current()->tid);
 
   int i;
   disk_sector_t ret = swap_get_slot ();
@@ -55,7 +49,6 @@ swap_out (void* phy_addr)
   }
 
   lock_release (&swap_lock);
-  //    printf("REL tid %d  release swap lock\n", thread_current()->tid);
   
   return ret;
 }
@@ -65,7 +58,6 @@ swap_in (disk_sector_t disk_no, void *phy_addr)
 {
   ASSERT (pg_ofs (phy_addr) == 0);
   lock_acquire (&swap_lock);
-  //    printf("ACQ tid %d  acquire swap lock\n", thread_current()->tid);
 
   int i;
 
@@ -76,5 +68,4 @@ swap_in (disk_sector_t disk_no, void *phy_addr)
   swap_free_slot (disk_no);
 
   lock_release (&swap_lock);
-  //    printf("REL tid %d  release swap lock\n", thread_current()->tid);
 }
