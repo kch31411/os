@@ -160,6 +160,7 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
 
   struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
+  bool isLockAcquired = false;
 
 //  printf ("Page fault occured %x, not_p:%d, write:%d, user:%d, page:%x, fromHard:%d, Swapped:%d Writable:%d \n", fault_addr, not_present, write, user, p, p->fromDisk, p->isDisk, p->writable);
 
@@ -183,7 +184,12 @@ page_fault (struct intr_frame *f)
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
 //    printf("ACQ tid %d frame lock\n", thread_current()->tid);
-    lock_acquire (&frame_lock);
+//    lock_acquire (&frame_lock);
+    if (lock_held_by_current_thread (&file_lock) == false)
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
 
     if (kpage != NULL)
     { 
@@ -191,25 +197,19 @@ page_fault (struct intr_frame *f)
     } 
     ASSERT (success == true);
 
-
-    bool isLockAcquired = false;
-    if (lock_held_by_current_thread (&file_lock)==false) 
-    {
-      lock_acquire (&file_lock);
-      isLockAcquired = true;
-    }
     int pos = file_tell (p->file);
     file_seek( p->file, p->file_start);
     int written = file_read (p->file, kpage, p->file_size);
     file_seek( p->file, pos);
-    if (isLockAcquired) lock_release(&file_lock);
 
     ASSERT (p->file_size == written);
 
-    pagedir_set_dirty(thread_current()->pagedir, pg_round_down(fault_addr), false);
+    pagedir_set_dirty (thread_current()->pagedir, pg_round_down (fault_addr), false);
 
 //    printf("REL tid %d frame lock\n", thread_current()->tid);
-    lock_release (&frame_lock);
+
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+//    lock_release (&frame_lock);
 
     return;
   }
@@ -222,10 +222,16 @@ page_fault (struct intr_frame *f)
     bool success = false;
 
 //    printf("ACQ tid %d frame lock\n", thread_current()->tid);
-    lock_acquire (&frame_lock);
+    
+    if (lock_held_by_current_thread (&file_lock) == false)
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
+        
+//    lock_acquire (&frame_lock);
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  
 
     if (kpage != NULL)
     { 
@@ -238,8 +244,9 @@ page_fault (struct intr_frame *f)
     p->isDisk = false;
     p->disk_no = NULL;
 
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 //    printf("REL tid %d frame lock\n", thread_current()->tid);
-    lock_release (&frame_lock);
+//    lock_release (&frame_lock);
     
     return;
   }
@@ -249,8 +256,13 @@ page_fault (struct intr_frame *f)
     uint8_t *kpage;
     bool success = false;
 
- //   printf("ACQ tid %d frame lock\n", thread_current()->tid);
-    lock_acquire (&frame_lock);
+    //   printf("ACQ tid %d frame lock\n", thread_current()->tid);
+    if (lock_held_by_current_thread (&file_lock) == false)
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
+
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
     if (kpage != NULL)
@@ -261,7 +273,7 @@ page_fault (struct intr_frame *f)
     ASSERT (success == true);
 
 //    printf("REL tid %d frame lock\n", thread_current()->tid);
-    lock_release (&frame_lock);
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 
     return;
   }

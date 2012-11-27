@@ -71,7 +71,6 @@ void syscall_halt (void)
 
 void syscall_exit (int status)
 {
-  //printf ("PID: %d\n", thread_current ()->tid);
   printf ("%s: exit(%d)\n", thread_current ()->name, status);
   thread_current ()->exit_status = status;
 
@@ -118,7 +117,7 @@ bool syscall_remove (const char *file)
 
 int syscall_read (int fd, void *buffer, unsigned size)
 {
-  int ret = -2;
+   int ret = -2;
   unsigned i;
 
   if (fd == 0)
@@ -136,16 +135,21 @@ int syscall_read (int fd, void *buffer, unsigned size)
     ret = -1;
   }
 
+  else if (is_valid_file (fd) == false) 
+  {
+    ret = -1;
+  }
   else 
   {
-    if (is_valid_file (fd) == false) ret = -1;
-    
-    else 
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&file_lock) == false)
     {
       lock_acquire (&file_lock);
-      ret = file_read (thread_current()->files[fd]->file, buffer, size);
-      lock_release (&file_lock);
+      isLockAcquired = true;
     }
+
+    ret = file_read (thread_current()->files[fd]->file, buffer, size);
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
   }
 
   return ret;
@@ -176,9 +180,16 @@ int syscall_write (int fd, const void *buffer, unsigned size)
 
     else
     {
-      lock_acquire (&file_lock);
+      bool isLockAcquired = false;
+      if (lock_held_by_current_thread (&file_lock) == false)
+      {
+        lock_acquire (&file_lock);
+        isLockAcquired = true;
+      }
+
+
       ret = file_write (thread_current()->files[fd]->file, buffer, size); 
-      lock_release (&file_lock);
+      if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
     }
   }
 
@@ -194,10 +205,17 @@ int syscall_open (const char *file)
     syscall_exit(-1);
   }
 
-  lock_acquire (&file_lock);
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
+
+
   struct file *open_file = filesys_open (file);
-  lock_release (&file_lock);
-  
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+
   if (open_file == NULL)
   {
     return -1;
@@ -407,15 +425,6 @@ void syscall_munmap (int mapid)
   void *addr = file_info->mm_addr;
   void *kpage;
 
-  bool isLockAcquired = false;
-  if (lock_held_by_current_thread (&file_lock) == false) 
-  {
-    lock_acquire (&file_lock);
-    isLockAcquired = true;
-  }
-  off_t pos = file_tell (file_info->file);
-  if (isLockAcquired == true) lock_release (&file_lock);
-
   int idx = 0;
   while (size > 0)
   {
@@ -431,13 +440,12 @@ void syscall_munmap (int mapid)
     {
       if (pagedir_is_dirty(t->pagedir, addr))
       {
-        isLockAcquired = false;
+        bool isLockAcquired = false;
         if (lock_held_by_current_thread (&file_lock) == false) 
         {
           lock_acquire (&file_lock);
           isLockAcquired = true;
         }
-
         int written = file_write_at (file_info->file, kpage, MIN(size, PGSIZE), idx);
         if (isLockAcquired == true) lock_release (&file_lock);
         ASSERT(written == MIN(size, PGSIZE));
@@ -454,16 +462,6 @@ void syscall_munmap (int mapid)
     addr += PGSIZE;
   }
 
-  isLockAcquired = false;
-  if (lock_held_by_current_thread (&file_lock) == false) 
-  {
-    lock_acquire (&file_lock);
-    isLockAcquired = true;
-  }
-
-  file_seek( file_info->file, pos);
-  if ( isLockAcquired == true ) lock_release (&file_lock);
-
   t->mmap_list[mapid] = 0;
   file_info->is_mapped = false;
 
@@ -477,7 +475,6 @@ void syscall_munmap (int mapid)
   em->mapid = t->files[fd]->mapid;
   list_push_front (&t->empty_mmap_list, &em->mmap_elem);
 
-  //printf ("unmap complete with id %d\n", thread_current()->tid);
 }
 
 static void

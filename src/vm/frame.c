@@ -1,6 +1,8 @@
 #include "vm/frame.h"
 #include "threads/vaddr.h"
 #include "threads/thread.h"
+#include "userprog/syscall.h"
+#include "vm/page.h"
 
 unsigned 
 frame_hash (const struct hash_elem *f_, void *aux UNUSED)
@@ -76,12 +78,12 @@ void
 frame_delete (void *phy_addr, bool isForce)
 {
   bool isLockAcquired = false;
-  if (lock_held_by_current_thread (&frame_lock) == false)
-  {
-    lock_acquire (&frame_lock);
-    isLockAcquired = true;
-  }
-  
+     if (lock_held_by_current_thread (&file_lock) == false)
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }
+
   struct frame f;
   struct frame *fr;
   struct hash_elem *eh;
@@ -129,7 +131,7 @@ frame_delete (void *phy_addr, bool isForce)
     free (fr);
   }
 
-  if (isLockAcquired == true) lock_release (&frame_lock);
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 }
 
 bool
@@ -196,9 +198,12 @@ frame_victim ()
     struct list_elem *e = list_pop_front (&frame_list);
     struct frame *f = list_entry (e, struct frame, list_elem);
 
+    struct page_pointer *pp = list_entry (list_front (&f->refer_pages), struct page_pointer, elem);
+    struct page *p = page_lookup (pp->thread, pp->addr);
+    
     list_push_back (&frame_list, e);
 
-    if (frame_is_accessed (f) == false)
+    if (frame_is_accessed (f) == false && p->fromDisk == false)
     {
        return f;
     }

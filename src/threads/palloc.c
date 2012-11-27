@@ -107,9 +107,10 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
 //    printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
     
     bool isLockAcquired = false;
-    if (lock_held_by_current_thread (&frame_lock) == false) 
+
+    if (lock_held_by_current_thread (&file_lock) == false)
     {
-      lock_acquire (&frame_lock);
+      lock_acquire (&file_lock);
       isLockAcquired = true;
     }
 
@@ -131,11 +132,9 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
           if (pagedir_is_dirty (pp->thread->pagedir, pp->addr))
           {
             struct file *file = p->file;
-            lock_acquire (&file_lock);
             int pos = file_tell (file);
             int written = file_write_at (file, pages+PGSIZE*i,p->file_size, p->file_start);
             file_seek(file, pos);
-            lock_release (&file_lock);
             ASSERT (written == p->file_size);
           }
 
@@ -172,7 +171,9 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     }
 
 //    printf("REL tid %d  release frame lock\n", thread_current()->tid);
-    if (isLockAcquired == true) lock_release (&frame_lock);
+  
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+ 
   }
 
   return pages;

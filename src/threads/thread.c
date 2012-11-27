@@ -296,22 +296,13 @@ thread_exit (void)
   int i;
   struct hash_iterator it;
 
-  dc = palloc_get_page (0);
-  ASSERT (dc != NULL);
-
-  dc->tid = cur->tid;
-  dc->exit_status = cur->exit_status;
-  
-//  printf ("thread exit: %d\n", cur->tid);
-  
-  if ( &cur->child_elem != NULL && (&cur->child_elem)->prev != NULL && (&cur->child_elem)->next != NULL )
+  int tmp[hash_size (&cur->pages)];
+  int tmp_idx = 0;
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
   {
-    list_remove(&cur->child_elem);
-  }
-
-  if (cur->parent != NULL && cur->load_success == true)
-  {
-    list_push_back (&cur->parent->dead_list, &dc->child_elem);
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
   }
 
   // file close
@@ -323,7 +314,7 @@ thread_exit (void)
       syscall_close(i);
     }
   }
- 
+
   // execute file close 
   if (cur->execute_file != NULL) 
   {
@@ -351,23 +342,7 @@ thread_exit (void)
     struct empty_mmap *ef = list_entry (list_pop_front (&cur->empty_mmap_list), struct empty_mmap, mmap_elem);
     palloc_free_page (ef);
   }
-/*
-  if (lock_held_by_current_thread (&file_lock)) {
-    lock_release(&file_lock);
-  }
-*/
-//  printf ("th exit 1\n");
 
-  int tmp[hash_size (&cur->pages)];
-  int tmp_idx = 0;
-  bool isLockAcquired = false;
-  if (lock_held_by_current_thread (&frame_lock) == false)
-  {
-    lock_acquire (&frame_lock);
-    isLockAcquired = true;
-  }
-
-  lock_acquire (&swap_lock);
   hash_first (&it, &cur->pages);
   hash_next (&it);
 
@@ -395,16 +370,30 @@ thread_exit (void)
     page_delete (tmp[i]);
   }
   
-  lock_release (&swap_lock);
-  if (isLockAcquired == true) lock_release (&frame_lock);
 
- // printf ("th exit 2");
-    
   hash_destroy(&cur->pages, NULL);
 
+  dc = palloc_get_page (0);
+  ASSERT (dc != NULL);
+
+  dc->tid = cur->tid;
+  dc->exit_status = cur->exit_status;
+
+
+  if ( &cur->child_elem != NULL && (&cur->child_elem)->prev != NULL && (&cur->child_elem)->next != NULL )
+  {
+    list_remove(&cur->child_elem);
+  }
+
+  if (cur->parent != NULL && cur->load_success == true)
+  {
+    list_push_back (&cur->parent->dead_list, &dc->child_elem);
+  }
 #ifdef USERPROG
   process_exit ();
 #endif
+
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 
   sema_up (&cur->end_sema);
 
