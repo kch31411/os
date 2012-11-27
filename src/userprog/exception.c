@@ -174,23 +174,22 @@ page_fault (struct intr_frame *f)
     //printf("fromDisk\n");
     if (not_present == false)
     {
-     // printf ("yogida\n");
       syscall_exit (-1);
       return;
     }
     void *kpage;
     bool success = false;
 
-    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-
-//    printf("ACQ tid %d frame lock\n", thread_current()->tid);
-//    lock_acquire (&frame_lock);
     if (lock_held_by_current_thread (&file_lock) == false)
     {
       lock_acquire (&file_lock);
       isLockAcquired = true;
     }
 
+    kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+
+//    printf("ACQ tid %d frame lock\n", thread_current()->tid);
+//    lock_acquire (&frame_lock);
     if (kpage != NULL)
     { 
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, p->writable);
