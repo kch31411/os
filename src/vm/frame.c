@@ -167,30 +167,7 @@ struct frame*
 frame_victim ()
 {
   struct hash_elem *e;
-
-  /*
-  hash_first (&frame_iter, &frames);
-  e = hash_next (&frame_iter);
-  struct frame *f = hash_entry (e, struct frame, elem);
-    printf ("victim: %x\n", f->phy_addr);
-  return f;
   
-
-  if (isFirst == true) 
-  {
-    hash_first (&frame_iter, &frames);
-    isFirst = false;
-  }
-
-  e = hash_next (&frame_iter);
-  if (e == NULL) 
-  {
-      hash_first (&frame_iter, &frames);
-      e = hash_next (&frame_iter);
-  }
-  return hash_entry (e, struct frame, elem);
-  */
-
   ASSERT ( list_empty (&frame_list) == false);
 
   while (1)
@@ -210,28 +187,4 @@ frame_victim ()
 
     else frame_reset_accessed (f);
   }
-/*
-  while (1)
-  {
-    e = hash_next (&frame_iter);
-    if (e == NULL) 
-    {
-      hash_first (&frame_iter, &frames);
-      continue;
-    }
-
-    struct frame *f = hash_entry (e, struct frame, elem);
-
-    if (frame_is_accessed (f) == false) 
-    {
-      if (hash_next (&frame_iter) == NULL)
-      {
-        hash_first (&frame_iter, &frames);
-      }
-
-//      printf ("will return %x\n", f);
-      return f;
-    }
-    else frame_reset_accessed (f);
-  } */
 }

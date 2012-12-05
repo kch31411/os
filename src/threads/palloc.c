@@ -104,8 +104,6 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   }
   else 
   {
-//    printf("ACQ tid %d acquire frame lock\n", thread_current()->tid);
-    
     bool isLockAcquired = false;
 
     if (lock_held_by_current_thread (&file_lock) == false)
@@ -153,7 +151,6 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
             struct page_pointer *pp = list_entry (e, struct page_pointer, elem);
 
             pagedir_clear_page (pp->thread->pagedir, pp->addr);
-            // TODO : swap should track all the pages indicating the disk slot
 
             struct page *p = page_lookup (pp->thread, pp->addr);
             p->disk_no = disk_no;
@@ -169,8 +166,6 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     {
       memset (pages, 0, PGSIZE * page_cnt);
     }
-
-//    printf("REL tid %d  release frame lock\n", thread_current()->tid);
   
     if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
  

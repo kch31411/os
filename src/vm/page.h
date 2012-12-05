@@ -9,7 +9,7 @@ struct page  // supplement page table
   struct hash_elem elem;   // for hash
   void *addr;                   // virtual address
   disk_sector_t disk_no;
-  bool isDisk;    // is swap disk???  name is confusing
+  bool isDisk;
   bool fromDisk;
 
   struct file *file;

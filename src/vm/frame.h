@@ -18,7 +18,6 @@ struct frame
   
   struct hash_elem elem;
   struct list_elem list_elem;
-  //struct lock lock;
 };
 
 struct hash frames;

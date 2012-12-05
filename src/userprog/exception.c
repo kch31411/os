@@ -162,8 +162,6 @@ page_fault (struct intr_frame *f)
   struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
   bool isLockAcquired = false;
 
-//  printf ("Page fault occured %x, not_p:%d, write:%d, user:%d, page:%x, fromHard:%d, Swapped:%d Writable:%d \n", fault_addr, not_present, write, user, p, p->fromDisk, p->isDisk, p->writable);
-
   if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)
   {
     syscall_exit (-1);
@@ -171,7 +169,6 @@ page_fault (struct intr_frame *f)
 
   if (p != NULL && p->fromDisk == true) // loaded from hard disk (lazy loading) 
   {
-    //printf("fromDisk\n");
     if (not_present == false)
     {
       syscall_exit (-1);
@@ -188,8 +185,6 @@ page_fault (struct intr_frame *f)
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
-//    printf("ACQ tid %d frame lock\n", thread_current()->tid);
-//    lock_acquire (&frame_lock);
     if (kpage != NULL)
     { 
       success = pagedir_set_page (thread_current ()->pagedir, pg_round_down (fault_addr), kpage, p->writable);
@@ -205,30 +200,21 @@ page_fault (struct intr_frame *f)
 
     pagedir_set_dirty (thread_current()->pagedir, pg_round_down (fault_addr), false);
 
-//    printf("REL tid %d frame lock\n", thread_current()->tid);
-
     if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
-//    lock_release (&frame_lock);
 
     return;
   }
 
   else if (p != NULL && p->isDisk == true) // swapped out
   {
-    //printf("swapped");
-
     uint8_t *kpage;
     bool success = false;
 
-//    printf("ACQ tid %d frame lock\n", thread_current()->tid);
-    
     if (lock_held_by_current_thread (&file_lock) == false)
     {
       lock_acquire (&file_lock);
       isLockAcquired = true;
     }
-        
-//    lock_acquire (&frame_lock);
 
     kpage = palloc_get_page (PAL_USER | PAL_ZERO);
 
@@ -244,8 +230,6 @@ page_fault (struct intr_frame *f)
     p->disk_no = NULL;
 
     if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
-//    printf("REL tid %d frame lock\n", thread_current()->tid);
-//    lock_release (&frame_lock);
     
     return;
   }
@@ -255,7 +239,6 @@ page_fault (struct intr_frame *f)
     uint8_t *kpage;
     bool success = false;
 
-    //   printf("ACQ tid %d frame lock\n", thread_current()->tid);
     if (lock_held_by_current_thread (&file_lock) == false)
     {
       lock_acquire (&file_lock);
@@ -271,7 +254,6 @@ page_fault (struct intr_frame *f)
 
     ASSERT (success == true);
 
-//    printf("REL tid %d frame lock\n", thread_current()->tid);
     if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 
     return;
@@ -279,7 +261,6 @@ page_fault (struct intr_frame *f)
 
   else
   {
-    //printf ("jinjjada\n");
     syscall_exit (-1);
   }
 

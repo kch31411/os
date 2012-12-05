@@ -328,8 +328,6 @@ void syscall_close (int fd)
 
 int syscall_mmap (int fd, void *addr)
 {
-  //printf ("mmap with %d\n", thread_current()->tid);
-
   if (is_valid_file (fd) == false) return -1;
 
   if (pg_ofs (addr) != 0 || is_valid_address(addr) == false || addr < 0x08048000) return -1;
@@ -411,13 +409,11 @@ int syscall_mmap (int fd, void *addr)
   t->files[fd]->mm_size = size; 
   t->files[fd]->mm_addr = addr;
 
-  //printf ("mmap complete with %d\n",thread_current()->tid);
   return ret;
 }
 
 void syscall_munmap (int mapid)
 {
-  //printf ("unmap with id %d\n",thread_current()->tid );
   struct thread *t = thread_current ();
   int fd = t->mmap_list[mapid];
   struct file_info *file_info = t->files[fd];
