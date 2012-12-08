@@ -180,7 +180,7 @@ frame_victim ()
     
     list_push_back (&frame_list, e);
 
-    if (frame_is_accessed (f) == false && p->fromDisk == false)
+    if (frame_is_accessed (f) == false && p->fromDisk == false )
     {
        return f;
     }

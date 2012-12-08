@@ -10,6 +10,8 @@
 #include "vm/frame.h"
 #include "userprog/syscall.h"
 
+#define MAX_STACK_SIZE 0x800000
+
 #define ABS(a) (((a) < (0))?-(a):(a))
 
 /* Number of page faults processed. */
@@ -234,7 +236,7 @@ page_fault (struct intr_frame *f)
     return;
   }
 
-  else if (p == NULL && (f->esp < fault_addr || ABS(f->esp - fault_addr) <= 32) && fault_addr > PHYS_BASE - 0x800000) // stack growth
+  else if (p == NULL && (f->esp < fault_addr || ABS(f->esp - fault_addr) <= 32) && fault_addr > PHYS_BASE - MAX_STACK_SIZE) // stack growth
   {
     uint8_t *kpage;
     bool success = false;

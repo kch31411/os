@@ -7,6 +7,7 @@
 #include "threads/io.h"
 #include "threads/interrupt.h"
 #include "threads/synch.h"
+#include "filesys/cache.h"
 
 /* The code in this file is an interface to an ATA (IDE)
    controller.  It attempts to comply to [ATA-3]. */
@@ -103,6 +104,8 @@ void
 disk_init (void) 
 {
   size_t chan_no;
+
+  cache_init ();
 
   for (chan_no = 0; chan_no < CHANNEL_CNT; chan_no++)
     {
@@ -219,6 +222,7 @@ disk_size (struct disk *d)
 void
 disk_read (struct disk *d, disk_sector_t sec_no, void *buffer) 
 {
+  //printf("read\n");
   struct channel *c;
   
   ASSERT (d != NULL);
@@ -226,14 +230,46 @@ disk_read (struct disk *d, disk_sector_t sec_no, void *buffer)
 
   c = d->channel;
   lock_acquire (&c->lock);
-  select_sector (d, sec_no);
-  issue_pio_command (c, CMD_READ_SECTOR_RETRY);
-  sema_down (&c->completion_wait);
-  if (!wait_while_busy (d))
-    PANIC ("%s: disk read failed, sector=%"PRDSNu, d->name, sec_no);
-  input_sector (c, buffer);
+
+  struct cache_entry *ce = cache_lookup (d, sec_no);
+
+  //printf ("start to read\n");
+
+  if (ce == NULL)
+  {
+    ce = cache_create (d, sec_no);
+
+    select_sector (d, sec_no);
+    issue_pio_command (c, CMD_READ_SECTOR_RETRY);
+
+    if (!wait_while_busy (d)) PANIC ("%s: disk read failed, sector=%"PRDSNu, d->name, sec_no);
+    
+    sema_down (&c->completion_wait);
+    input_sector (c, ce->addr); 
+  }
+
+  //printf("READ :  memcpy from %x, to %x\n", ce->addr, buffer);
+  memcpy (buffer, ce->addr, DISK_SECTOR_SIZE); 
+  ce->access = true;
+
+// input_sector (c, buffer);
   d->read_cnt++;
   lock_release (&c->lock);
+}
+
+void
+disk_force_write (struct disk *d, disk_sector_t sec_no, const void *buffer)
+{
+  //printf ("force write %s\n", buffer);
+  struct channel *c = d->channel;
+  select_sector (d, sec_no);
+  issue_pio_command (c, CMD_WRITE_SECTOR_RETRY);
+
+  if (!wait_while_busy (d)) PANIC ("%s: disk write failed, sector=%"PRDSNu, d->name, sec_no);
+
+  output_sector (c, buffer); // write del->addr to disk
+  //printf ("force write done\n");
+  sema_down (&c->completion_wait);
 }
 
 /* Write sector SEC_NO to disk D from BUFFER, which must contain
@@ -244,6 +280,7 @@ disk_read (struct disk *d, disk_sector_t sec_no, void *buffer)
 void
 disk_write (struct disk *d, disk_sector_t sec_no, const void *buffer)
 {
+  //printf ("write %s\n", buffer);
   struct channel *c;
   
   ASSERT (d != NULL);
@@ -251,12 +288,21 @@ disk_write (struct disk *d, disk_sector_t sec_no, const void *buffer)
 
   c = d->channel;
   lock_acquire (&c->lock);
-  select_sector (d, sec_no);
-  issue_pio_command (c, CMD_WRITE_SECTOR_RETRY);
-  if (!wait_while_busy (d))
-    PANIC ("%s: disk write failed, sector=%"PRDSNu, d->name, sec_no);
-  output_sector (c, buffer);
-  sema_down (&c->completion_wait);
+
+  struct cache_entry *ce = cache_lookup (d, sec_no);
+
+  if (ce == NULL)
+  {
+    ce = cache_create (d, sec_no);
+  }
+
+  //printf("WRITE : memcpy from %x, to %x\n", buffer, ce->addr);
+  memcpy (ce->addr, buffer, DISK_SECTOR_SIZE);
+  ce->dirty = true;
+  ce->access = true;
+  
+  //sema_down (&c->completion_wait);
+
   d->write_cnt++;
   lock_release (&c->lock);
 }

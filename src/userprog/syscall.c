@@ -470,7 +470,6 @@ void syscall_munmap (int mapid)
 
   em->mapid = t->files[fd]->mapid;
   list_push_front (&t->empty_mmap_list, &em->mmap_elem);
-
 }
 
 static void
