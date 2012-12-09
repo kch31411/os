@@ -238,7 +238,7 @@ disk_read (struct disk *d, disk_sector_t sec_no, void *buffer)
   if (ce == NULL)
   {
     ce = cache_create (d, sec_no);
-
+    
     select_sector (d, sec_no);
     issue_pio_command (c, CMD_READ_SECTOR_RETRY);
 

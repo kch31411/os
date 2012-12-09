@@ -187,7 +187,6 @@ int syscall_write (int fd, const void *buffer, unsigned size)
         isLockAcquired = true;
       }
 
-
       ret = file_write (thread_current()->files[fd]->file, buffer, size); 
       if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
     }
@@ -211,7 +210,6 @@ int syscall_open (const char *file)
     lock_acquire (&file_lock);
     isLockAcquired = true;
   }
-
 
   struct file *open_file = filesys_open (file);
   if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
