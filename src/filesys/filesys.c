@@ -314,6 +314,7 @@ filesys_readdir (struct dir *dir, char *name)
   {
     success = false;
     success = dir_readdir (dir, name);
+    if (success == false) return success;
   }
   while (strcmp (name, ".") == 0 || strcmp (name, "..") == 0);
 
