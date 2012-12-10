@@ -101,6 +101,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  strlcpy(initial_thread->cwd, "/", 2);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -271,6 +272,8 @@ thread_current (void)
      have overflowed its stack.  Each thread has less than 4 kB
      of stack, so a few big automatic arrays or moderate
      recursion can cause stack overflow. */
+//  if ( t == NULL)  printf ("Thread current is NULL ----- t : %x\n", t);
+//  else if (t->magic != THREAD_MAGIC) printf("error : t is not thread (MAGIC)\n");
   ASSERT (is_thread (t));
   ASSERT (t->status == THREAD_RUNNING);
 

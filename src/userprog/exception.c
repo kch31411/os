@@ -166,6 +166,7 @@ page_fault (struct intr_frame *f)
 
   if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)
   {
+    if (lock_held_by_current_thread (&file_lock)) lock_release (&file_lock);
     syscall_exit (-1);
   }
 
@@ -263,6 +264,7 @@ page_fault (struct intr_frame *f)
 
   else
   {
+    if (lock_held_by_current_thread (&file_lock)) lock_release (&file_lock);
     syscall_exit (-1);
   }
 

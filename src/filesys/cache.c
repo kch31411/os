@@ -24,7 +24,7 @@ cache_init ()
   cache = palloc_get_page (0);  // kernel pool
 
   //cache->start_addr = malloc ((size_t) CACHE_SIZE * DISK_SECTOR_SIZE);
-  cache->start_addr = palloc_get_multiple(0, CACHE_SIZE/SEC_PER_PG);
+  cache->start_addr = palloc_get_multiple (0, CACHE_SIZE / SEC_PER_PG);
   cache->bitmap = bitmap_create ((size_t) CACHE_SIZE);
   hash_init (&cache->hash, cache_hash, cache_less, NULL);
   list_init (&cache->list); 
@@ -122,9 +122,14 @@ void cache_delete (struct disk *disk, disk_sector_t disk_no)
 
   del = hash_entry (e, struct cache_entry, hash_elem);
 
+//  printf ("del slot %d\n", (del->addr - cache->start_addr) / DISK_SECTOR_SIZE);
+  //printf("DELETE : disk %x, sec %d, addr %x\n", del->disk, del->disk_no, del->addr);
+
   if (del->dirty == true)
   {
+//    printf("dirty\n");
     disk_force_write (del->disk, del->disk_no, del->addr);
+//    printf("force write done\n");
   }
 
   hash_delete (&cache->hash, &del->hash_elem);

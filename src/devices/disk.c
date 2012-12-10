@@ -280,7 +280,6 @@ disk_force_write (struct disk *d, disk_sector_t sec_no, const void *buffer)
 void
 disk_write (struct disk *d, disk_sector_t sec_no, const void *buffer)
 {
-  //printf ("write %s\n", buffer);
   struct channel *c;
   
   ASSERT (d != NULL);

@@ -22,5 +22,10 @@ unsigned syscall_tell (int);
 void syscall_close (int);
 int syscall_mmap (int fd, void *addr);
 void syscall_munmap (int);
+bool syscall_chdir (const char *);
+bool syscall_mkdir (const char *);
+bool syscall_readdir (int fd, char *name);
+bool syscall_isdir (int fd);
+int inumber (int fd);
 
 #endif /* userprog/syscall.h */

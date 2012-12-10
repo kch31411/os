@@ -62,6 +62,7 @@ make_tar_archive (const char *archive_name, char *files[], size_t file_cnt)
   archive_fd = open (archive_name);
   if (archive_fd < 0)
     {
+      ASSERT(false);
       printf ("%s: open failed\n", archive_name);
       return false;
     }
@@ -89,6 +90,7 @@ static bool
 archive_file (char file_name[], size_t file_name_size,
               int archive_fd, bool *write_error) 
 {
+  //printf("archive file : %s\n", file_name);
   int file_fd = open (file_name);
   if (file_fd >= 0) 
     {
@@ -115,6 +117,7 @@ archive_file (char file_name[], size_t file_name_size,
     }
   else
     {
+      ASSERT(false);
       printf ("%s: open failed\n", file_name);
       return false;
     }

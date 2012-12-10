@@ -26,7 +26,7 @@ struct dir_entry
 bool
 dir_create (disk_sector_t sector, size_t entry_cnt) 
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), TYPE_DIRECTORY);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -94,12 +94,13 @@ lookup (const struct dir *dir, const char *name,
 {
   struct dir_entry e;
   size_t ofs;
-  
+
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
   for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
-       ofs += sizeof e) 
+       ofs += sizeof e)
+  {
     if (e.in_use && !strcmp (name, e.name)) 
       {
         if (ep != NULL)
@@ -108,6 +109,8 @@ lookup (const struct dir *dir, const char *name,
           *ofsp = ofs;
         return true;
       }
+  }
+
   return false;
 }
 
@@ -154,7 +157,9 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
 
   /* Check that NAME is not in use. */
   if (lookup (dir, name, NULL, NULL))
+  {
     goto done;
+  }
 
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
@@ -228,7 +233,9 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
       dir->pos += sizeof e;
       if (e.in_use)
         {
+//          printf ("readdir name:%x, name:%s, pos:%d\n", name, e.name, dir->pos);
           strlcpy (name, e.name, NAME_MAX + 1);
+ //         printf ("strlcpy end\n");
           return true;
         } 
     }

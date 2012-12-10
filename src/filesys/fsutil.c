@@ -21,7 +21,10 @@ fsutil_ls (char **argv UNUSED)
   printf ("Files in the root directory:\n");
   dir = dir_open_root ();
   if (dir == NULL)
+  {
+    ASSERT(false);
     PANIC ("root dir open failed");
+  }
   while (dir_readdir (dir, name))
     printf ("%s\n", name);
   printf ("End of listing.\n");
@@ -36,11 +39,16 @@ fsutil_cat (char **argv)
   
   struct file *file;
   char *buffer;
+  bool temp;
 
   printf ("Printing '%s' to the console...\n", file_name);
-  file = filesys_open (file_name);
+  file = filesys_open (file_name, &temp);
   if (file == NULL)
+  {
+    printf ("error : file open fail");
+    ASSERT(false);
     PANIC ("%s: open failed", file_name);
+  }
   buffer = palloc_get_page (PAL_ASSERT);
   for (;;) 
     {
@@ -88,6 +96,7 @@ fsutil_put (char **argv)
   struct file *dst;
   off_t size;
   void *buffer;
+  bool temp;
 
   printf ("Putting '%s' into the file system...\n", file_name);
 
@@ -112,9 +121,12 @@ fsutil_put (char **argv)
   /* Create destination file. */
   if (!filesys_create (file_name, size))
     PANIC ("%s: create failed", file_name);
-  dst = filesys_open (file_name);
+  dst = filesys_open (file_name, &temp);
   if (dst == NULL)
+  {
+    ASSERT(false);
     PANIC ("%s: open failed", file_name);
+  }
 
   /* Do copy. */
   while (size > 0)
@@ -153,6 +165,7 @@ fsutil_get (char **argv)
   struct file *src;
   struct disk *dst;
   off_t size;
+  bool temp;
 
   printf ("Getting '%s' from the file system...\n", file_name);
 
@@ -162,9 +175,12 @@ fsutil_get (char **argv)
     PANIC ("couldn't allocate buffer");
 
   /* Open source file. */
-  src = filesys_open (file_name);
+  src = filesys_open (file_name, &temp);
   if (src == NULL)
+  {
+    ASSERT(false);
     PANIC ("%s: open failed", file_name);
+  }
   size = file_length (src);
 
   /* Open target disk. */

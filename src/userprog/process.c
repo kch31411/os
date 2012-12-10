@@ -95,7 +95,9 @@ start_process (void *f_name)
   success = load (file_name, &if_.eip, &if_.esp);
   
   thread_current ()->parent->create_success = success;
-  
+
+  char *cwd = thread_current ()->parent->cwd;
+  strlcpy(thread_current ()->cwd, cwd, strlen(cwd) + 1);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -292,6 +294,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int len;
   char *ptr;
 
+  bool temp;
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
@@ -303,10 +307,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   for (argv[argc] = strtok_r (file_name, " ", &save_ptr); argv[argc] != NULL; argv[++argc] = strtok_r (NULL, " ", &save_ptr));
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (file_name, &temp);
 
   if (file == NULL) 
     {
+      ASSERT(false);
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }

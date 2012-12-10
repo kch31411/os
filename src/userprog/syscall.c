@@ -36,7 +36,11 @@ bool is_valid_file (int fd)
   {
     return false;
   }
-  if (thread_current() -> files[fd]-> is_closed == true)
+  if (thread_current ()->files[fd]->is_closed == true)
+  {
+    return false;
+  }
+  if (thread_current ()->files[fd]->is_dir == true)
   {
     return false;
   }
@@ -117,8 +121,15 @@ bool syscall_remove (const char *file)
 
 int syscall_read (int fd, void *buffer, unsigned size)
 {
-   int ret = -2;
+  int ret = -2;
   unsigned i;
+
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
 
   if (fd == 0)
   {
@@ -141,16 +152,10 @@ int syscall_read (int fd, void *buffer, unsigned size)
   }
   else 
   {
-    bool isLockAcquired = false;
-    if (lock_held_by_current_thread (&file_lock) == false)
-    {
-      lock_acquire (&file_lock);
-      isLockAcquired = true;
-    }
-
     ret = file_read (thread_current()->files[fd]->file, buffer, size);
-    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
   }
+    
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 
   return ret;
 }
@@ -159,6 +164,13 @@ int syscall_write (int fd, const void *buffer, unsigned size)
 {
   int ret = -2;
   unsigned i;
+
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
 
   if (fd == 0)
   {
@@ -180,18 +192,12 @@ int syscall_write (int fd, const void *buffer, unsigned size)
 
     else
     {
-      bool isLockAcquired = false;
-      if (lock_held_by_current_thread (&file_lock) == false)
-      {
-        lock_acquire (&file_lock);
-        isLockAcquired = true;
-      }
-
       ret = file_write (thread_current()->files[fd]->file, buffer, size); 
-      if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
     }
   }
 
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+  
   return ret;
 }
 
@@ -211,8 +217,8 @@ int syscall_open (const char *file)
     isLockAcquired = true;
   }
 
-  struct file *open_file = filesys_open (file);
-  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+  bool is_dir = false;
+  void *open_file = filesys_open (file, &is_dir);
 
   if (open_file == NULL)
   {
@@ -222,13 +228,17 @@ int syscall_open (const char *file)
   else 
   {
     struct thread *cur = thread_current();
+   // printf ("isDir? %d\n", is_dir);
     
     if (list_empty (&cur->empty_fd_list) == true)
     {
       cur->files[cur->fd_idx]= palloc_get_page(0);
       cur->files[cur->fd_idx]->file = open_file;
+      cur->files[cur->fd_idx]->is_dir = is_dir;
       cur->files[cur->fd_idx]->is_mapped = false;
       cur->files[cur->fd_idx]->is_closed = false;
+
+     // printf ("thread:%x, fd:%d isdir:%d\n", cur, cur->fd_idx, cur->files[cur->fd_idx]->is_dir);
 
       ret = cur->fd_idx++;
     }
@@ -242,11 +252,14 @@ int syscall_open (const char *file)
 
       cur->files[ret] = palloc_get_page(0);
       cur->files[ret]->file = open_file;
+      cur->files[ret]->is_dir = is_dir;
       cur->files[ret]->is_mapped = false;
       cur->files[ret]->is_closed = false;
     }
   }
 
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+  
   return ret;
 }
 
@@ -297,19 +310,32 @@ void syscall_close (int fd)
   struct thread *t = thread_current();
   ASSERT (e != NULL);
 
-  if (is_valid_file (fd) == false) return; 
+  if (fd < 2 || fd >= thread_current ()->fd_idx) 
+  {
+    return ;
+  }
+  
+  if (thread_current ()->files[fd]->file == NULL) 
+  {
+    return ;
+  }
+  if (thread_current ()->files[fd]->is_closed == true)
+  {
+    return ;
+  }
+
+//  if (is_valid_file (fd) == false) return;
+
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false) 
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
 
   if (t->files[fd]->is_mapped == false) 
   {
-    bool isLockAcquired = false;
-    if (lock_held_by_current_thread (&file_lock) == false) 
-    {
-      lock_acquire (&file_lock);
-      isLockAcquired = true;
-    }
-
     file_close (t->files[fd]->file);
-    if (isLockAcquired == true) lock_release (&file_lock);
 
     e->fd = fd;
     list_push_front (&t->empty_fd_list, &e->fd_elem);
@@ -322,6 +348,8 @@ void syscall_close (int fd)
   {
     t->files[fd]->is_closed = true;
   }
+    
+  if (isLockAcquired == true) lock_release (&file_lock);
 }
 
 int syscall_mmap (int fd, void *addr)
@@ -329,6 +357,13 @@ int syscall_mmap (int fd, void *addr)
   if (is_valid_file (fd) == false) return -1;
 
   if (pg_ofs (addr) != 0 || is_valid_address(addr) == false || addr < 0x08048000) return -1;
+
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false) 
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
 
   struct thread *t = thread_current();
   struct file *file = t->files[fd]->file;
@@ -398,15 +433,15 @@ int syscall_mmap (int fd, void *addr)
     t->mmap_list[ret] = fd;
   }
 
-  lock_acquire(&file_lock);
   file_seek (file, pos);
-  lock_release(&file_lock);
 
   t->files[fd]->is_mapped = true;
   t->files[fd]->mapid = ret;
   t->files[fd]->mm_size = size; 
   t->files[fd]->mm_addr = addr;
 
+  if (isLockAcquired == true) lock_release (&file_lock);
+  
   return ret;
 }
 
@@ -418,6 +453,13 @@ void syscall_munmap (int mapid)
   int size = file_info->mm_size;
   void *addr = file_info->mm_addr;
   void *kpage;
+
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false) 
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
 
   int idx = 0;
   while (size > 0)
@@ -434,14 +476,7 @@ void syscall_munmap (int mapid)
     {
       if (pagedir_is_dirty(t->pagedir, addr))
       {
-        bool isLockAcquired = false;
-        if (lock_held_by_current_thread (&file_lock) == false) 
-        {
-          lock_acquire (&file_lock);
-          isLockAcquired = true;
-        }
         int written = file_write_at (file_info->file, kpage, MIN(size, PGSIZE), idx);
-        if (isLockAcquired == true) lock_release (&file_lock);
         ASSERT(written == MIN(size, PGSIZE));
       }
 
@@ -468,6 +503,49 @@ void syscall_munmap (int mapid)
 
   em->mapid = t->files[fd]->mapid;
   list_push_front (&t->empty_mmap_list, &em->mmap_elem);
+
+  if (isLockAcquired == true) lock_release (&file_lock);
+}
+
+// should implement lock
+bool syscall_chdir (const char *dir)
+{
+  return filesys_chdir (dir); 
+}
+
+bool syscall_mkdir (const char *dir)
+{
+  return filesys_mkdir (dir);
+}
+
+bool syscall_readdir (int fd, char *name)
+{
+  if (syscall_isdir (fd) == false) return false;
+
+  else  
+  {
+    return filesys_readdir (thread_current ()->files[fd]->file, name);
+  }
+}
+
+bool syscall_isdir (int fd)
+{
+  //printf ("thread:%x, fd:%d re:%d\n", thread_current (), fd, thread_current ()->files[fd]->is_dir);
+  return (thread_current ()->files[fd]->is_dir == true);
+}
+
+int syscall_inumber (int fd)
+{
+//  if (syscall_isdir (fd) == true)
+  if (thread_current ()->files[fd]->is_dir)
+  {
+    return inode_get_inumber (dir_get_inode (thread_current ()->files[fd]->file));
+  }
+
+  else
+  {
+    return inode_get_inumber (file_get_inode (thread_current ()->files[fd]->file));
+  }
 }
 
 static void
@@ -492,6 +570,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_CLOSE: syscall_close (arg_get(ARG(1))); break;
     case SYS_MMAP: f->eax = syscall_mmap (arg_get(ARG(1)), arg_get(ARG(2))); break;
     case SYS_MUNMAP: syscall_munmap (arg_get(ARG(1))); break;
+    case SYS_CHDIR: f->eax = syscall_chdir (arg_get(ARG(1))); break;
+    case SYS_MKDIR: f->eax =  syscall_mkdir (arg_get(ARG(1))); break;
+    case SYS_READDIR: f->eax = syscall_readdir (arg_get(ARG(1)), arg_get(ARG(2))); break;
+    case SYS_ISDIR: f->eax = syscall_isdir (arg_get(ARG(1))); break;
+    case SYS_INUMBER: f->eax = syscall_inumber (arg_get(ARG(1))); break;
     default: ASSERT(false); break;
   } 
 }
