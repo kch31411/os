@@ -183,6 +183,26 @@ dir_add (struct dir *dir, const char *name, disk_sector_t inode_sector)
   return success;
 }
 
+bool dir_is_empty( struct dir *dir)
+{
+  struct dir_entry e;
+
+  int pos = 0;
+
+  while (inode_read_at (dir->inode, &e, sizeof e, pos) == sizeof e) 
+    {
+      pos += sizeof e;
+      if (e.in_use)
+        {
+          if (strcmp(e.name,".")==0 || strcmp(e.name,"..")==0) continue;
+          return false;
+        } 
+    }
+  return true;
+
+}
+
+
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
    which occurs only if there is no file with the given NAME. */
@@ -205,6 +225,18 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
+
+  if (inode_get_type(inode) == TYPE_DIRECTORY)
+  {
+    struct dir *dir = dir_open(inode);
+    if (dir_is_empty(dir) == false)
+    {
+      dir_close(dir);
+      goto done;
+    }
+    dir_close(dir);
+
+  }
 
   /* Erase directory entry. */
   e.in_use = false;
