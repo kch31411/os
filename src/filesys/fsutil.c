@@ -22,7 +22,6 @@ fsutil_ls (char **argv UNUSED)
   dir = dir_open_root ();
   if (dir == NULL)
   {
-    ASSERT(false);
     PANIC ("root dir open failed");
   }
   while (dir_readdir (dir, name))
@@ -46,7 +45,6 @@ fsutil_cat (char **argv)
   if (file == NULL)
   {
     printf ("error : file open fail");
-    ASSERT(false);
     PANIC ("%s: open failed", file_name);
   }
   buffer = palloc_get_page (PAL_ASSERT);
@@ -124,7 +122,6 @@ fsutil_put (char **argv)
   dst = filesys_open (file_name, &temp);
   if (dst == NULL)
   {
-    ASSERT(false);
     PANIC ("%s: open failed", file_name);
   }
 
@@ -178,7 +175,6 @@ fsutil_get (char **argv)
   src = filesys_open (file_name, &temp);
   if (src == NULL)
   {
-    ASSERT(false);
     PANIC ("%s: open failed", file_name);
   }
   size = file_length (src);

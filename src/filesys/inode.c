@@ -93,7 +93,7 @@ inode_create (disk_sector_t sector, off_t length, enum file_status type)
 
   if (disk_inode == NULL) success = false;
 
-  ASSERT (free_map_allocate (1, &child) == true);
+  if (free_map_allocate (1, &child) == false) return false;
   disk_inode->child = child;
   disk_inode->length = length;
   disk_inode->magic = INODE_MAGIC;
@@ -105,24 +105,24 @@ inode_create (disk_sector_t sector, off_t length, enum file_status type)
 
   for (i = 0; i < lv1; i++)
   {
-    ASSERT (free_map_allocate (1, &child) == true);
+    if (free_map_allocate (1, &child) == false) return false;
     ic->pt[i] = child;
 
     for (j = 0; j < PT_PER_SECTOR; j++)
     {
-      ASSERT (free_map_allocate (1, &child) == true);
+      if (free_map_allocate (1, &child) == false) return false;
       ic2->pt[j] = child;  
     }
 
     disk_write (filesys_disk, ic->pt[i], ic2);
   }
 
-  ASSERT (free_map_allocate (1, &child) == true);
+  if (free_map_allocate (1, &child) == false) return false;
   ic->pt[lv1] = child;
   
   for (j = 0; j <= lv2; j++)
   {
-      ASSERT (free_map_allocate (1, &child) == true);
+      if (free_map_allocate (1, &child) == false) return false;
       ic2->pt[j] = child; 
   }
   for (; j < PT_PER_SECTOR; j++) ic2->pt[j] = NULL;
@@ -316,12 +316,12 @@ inode_remove (struct inode *inode)
 off_t
 inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) 
 {
-   bool isLockAcquired = false;
+/*   bool isLockAcquired = false;
   if (lock_held_by_current_thread (&file_lock) == false)
   {
     lock_acquire (&file_lock);
     isLockAcquired = true;
-  }
+  } */
 
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
@@ -399,7 +399,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   palloc_free_page (tmp1);
   palloc_free_page (tmp2);
 
-  if (isLockAcquired == true) lock_release (&file_lock);
+//  if (isLockAcquired == true) lock_release (&file_lock);
 
   return bytes_read;
 }
@@ -415,12 +415,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 {
 //  printf ("write at %x size%d\n", inode, size);
 
-  bool isLockAcquired = false;
+/*  bool isLockAcquired = false;
   if (lock_held_by_current_thread (&file_lock) == false)
   {
     lock_acquire (&file_lock);
     isLockAcquired = true;
-  }
+  } */
 
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
@@ -431,11 +431,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
   {
-    if (isLockAcquired == true) lock_release (&file_lock);
+//    if (isLockAcquired == true) lock_release (&file_lock);
     return 0;
   }
 
   if (inode_length (inode) < offset + size) inode->data.length = offset + size;
+  disk_write (filesys_disk, inode->sector, &inode->data);
   
   while (size > 0) 
     {
@@ -448,7 +449,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       {
         struct inode_child *ic = palloc_get_page (PAL_ZERO);
         disk_sector_t child;
-        ASSERT (free_map_allocate (1, &child) == true);
+        if (free_map_allocate (1, &child) == false) return false;
 
         for (i = 0; i < PT_PER_SECTOR; i++) ic->pt[i] = NULL; 
         disk_write (filesys_disk, child, ic);  // fill with NULL 
@@ -462,7 +463,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       if (tmp2->pt[lv2] == NULL)
       {
         disk_sector_t child;
-        ASSERT (free_map_allocate (1, &child) == true);
+        if (free_map_allocate (1, &child) == false) return false;
         tmp2->pt[lv2] = child;
         disk_write (filesys_disk, tmp1->pt[lv1], tmp2);
       }
@@ -518,7 +519,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   palloc_free_page (tmp1);
   palloc_free_page (tmp2);
 
-  if (isLockAcquired == true) lock_release (&file_lock);
+ // if (isLockAcquired == true) lock_release (&file_lock);
 
   return bytes_written;
 }

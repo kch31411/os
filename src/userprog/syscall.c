@@ -27,7 +27,7 @@ bool is_valid_address (void *a)
 
 bool is_valid_file (int fd)
 {
-  if (fd < 2 || fd >= thread_current ()->fd_idx) 
+  if (fd < 2 || fd >= thread_current ()->fd_idx || thread_current ()->files[fd] == NULL) 
   {
     return false;
   }
@@ -160,13 +160,15 @@ int syscall_read (int fd, void *buffer, unsigned size)
   {
     ret = -1;
   }
+
   else 
   {
     ret = file_read (thread_current()->files[fd]->file, buffer, size);
   }
-    
+  
   if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 
+//  printf("read : %d size%d\n", ret, syscall_filesize (fd));
   return ret;
 }
 
@@ -232,26 +234,15 @@ int syscall_open (const char *file)
 
   if (open_file == NULL)
   {
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
     return -1;
   }
 
   else 
   {
     struct thread *cur = thread_current();
-   // printf ("isDir? %d\n", is_dir);
     
-    if (list_empty (&cur->empty_fd_list) == true)
-    {
-      cur->files[cur->fd_idx]= palloc_get_page(0);
-      cur->files[cur->fd_idx]->file = open_file;
-      cur->files[cur->fd_idx]->is_dir = is_dir;
-      cur->files[cur->fd_idx]->is_mapped = false;
-      cur->files[cur->fd_idx]->is_closed = false;
-
-     // printf ("thread:%x, fd:%d isdir:%d\n", cur, cur->fd_idx, cur->files[cur->fd_idx]->is_dir);
-
-      ret = cur->fd_idx++;
-    }
+    if (list_empty (&cur->empty_fd_list) == true) ret = cur->fd_idx++;
 
     else 
     {
@@ -259,17 +250,17 @@ int syscall_open (const char *file)
       ret = e->fd;
 
       palloc_free_page (e); 
+    }  
 
-      cur->files[ret] = palloc_get_page(0);
-      cur->files[ret]->file = open_file;
-      cur->files[ret]->is_dir = is_dir;
-      cur->files[ret]->is_mapped = false;
-      cur->files[ret]->is_closed = false;
-    }
+    cur->files[ret]= palloc_get_page(0);
+    cur->files[ret]->file = open_file;
+    cur->files[ret]->is_dir = is_dir;
+    cur->files[ret]->is_mapped = false;
+    cur->files[ret]->is_closed = false;
   }
 
   if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
-  
+ 
   return ret;
 }
 
@@ -281,9 +272,16 @@ int syscall_filesize (int fd)
   
   else
   {
-    lock_acquire (&file_lock);
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&file_lock) == false)
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }    
+    
     ret = file_length (thread_current()->files[fd]->file);
-    lock_release (&file_lock);
+    
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
   }
 
   return ret;
@@ -292,10 +290,17 @@ int syscall_filesize (int fd)
 void syscall_seek (int fd, unsigned position)
 {
   if (is_valid_file (fd) == false) return;
-
-  lock_acquire (&file_lock);
+  
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }  
+  
   file_seek (thread_current()->files[fd]->file, position);
-  lock_release (&file_lock);
+  
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
 }
 
 unsigned syscall_tell (int fd)
@@ -305,10 +310,18 @@ unsigned syscall_tell (int fd)
   if (is_valid_file (fd) == false) ret = 0;
 
   else
-  {
-    lock_acquire (&file_lock);
+  { 
+    if (is_valid_file (fd) == false) return;
+    bool isLockAcquired = false;
+    if (lock_held_by_current_thread (&file_lock) == false)
+    {
+      lock_acquire (&file_lock);
+      isLockAcquired = true;
+    }  
+
     ret = file_tell (thread_current()->files[fd]->file);
-    lock_release (&file_lock);
+    
+    if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
   }
 
   return ret;
@@ -383,16 +396,17 @@ int syscall_mmap (int fd, void *addr)
   int page_cnt = size / PGSIZE;
   if (size % PGSIZE != 0) page_cnt += 1;
 
-  lock_acquire(&file_lock);
   off_t pos = file_tell (file);
-  lock_release(&file_lock);
 
   int i;
   void *cur_addr = addr;
   for (i = 0; i < page_cnt; i++)
   {
-    if (pagedir_get_page (t->pagedir, cur_addr) != NULL) return -1;
-    if (page_lookup (t, cur_addr) != NULL) return -1;
+    if (pagedir_get_page (t->pagedir, cur_addr) != NULL || page_lookup (t, cur_addr) != NULL)
+    {
+      if (isLockAcquired == true) lock_release (&file_lock);
+      return -1;
+    }
 
     cur_addr += PGSIZE;
   }
@@ -540,7 +554,6 @@ bool syscall_readdir (int fd, char *name)
 
 bool syscall_isdir (int fd)
 {
-  //printf ("thread:%x, fd:%d re:%d\n", thread_current (), fd, thread_current ()->files[fd]->is_dir);
   return (thread_current ()->files[fd]->is_dir == true);
 }
 

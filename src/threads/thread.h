@@ -16,8 +16,6 @@ enum thread_status
     THREAD_DYING        /* About to be destroyed. */
   };
 
-
-
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -28,8 +26,8 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define MAX_FILE 16 
-#define MAX_CWD_LENGTH 64
+#define MAX_FILE 32
+#define MAX_CWD_LENGTH 128
 
 /* A kernel thread or user process.
 
@@ -128,7 +126,7 @@ struct thread
     int mmap_list[MAX_FILE];
     struct list empty_mmap_list;
 
-    char cwd[MAX_CWD_LENGTH];
+    struct dir *cwd;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

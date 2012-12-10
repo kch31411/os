@@ -31,6 +31,11 @@ filesys_init (bool format)
     do_format ();
 
   free_map_open ();
+
+  dir_add (dir_open_root (), ".", ROOT_DIR_SECTOR);
+  dir_add (dir_open_root (), "..", ROOT_DIR_SECTOR);
+
+  thread_current ()->cwd = dir_open_root ();
 }
 
 /* Shuts down the file system module, writing any unwritten data
@@ -59,7 +64,7 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
   if (isRoot == true)
   {
     if (parent != NULL) *parent = ROOT_DIR_SECTOR;
-    file_name[0] = 0;
+    file_name[0] = '\0';
     return dir_open_root ();
   }
 
@@ -69,36 +74,29 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
     file_name[0] = 0;
     return NULL;
   }
+  
+  struct dir *cd;
+  
+  if (name[0] == '/') cd = dir_open_root ();
+  else cd = dir_reopen (thread_current ()->cwd);
 
-  char *dir = palloc_get_page (0);
-
-  if (name[0] == '/')
-  {
-    strlcpy (dir, name, strlen (name) + 1); 
-  }
-
-  else
-  {
-    strlcpy (dir, thread_current ()->cwd, strlen (thread_current ()->cwd) + 1);
-    strlcat (dir, name, strlen (name) + strlen (dir) + 1); 
-  }
+  char *tmp = palloc_get_page (0);
+  strlcpy (tmp, name, strlen (name) + 1);
 
   char *save_ptr = NULL;
-  struct dir *cd = dir_open_root ();
-
-  char *tok = strtok_r (dir, "/", &save_ptr);
+  char *tok = strtok_r (tmp, "/", &save_ptr);
 
   while (1)
   {
     struct inode *inode = NULL;
-
-    dir_lookup (cd, tok, &inode);
-//    printf("filename : %s\n", tok);
+    
     if (*save_ptr == NULL) 
     {
       strlcpy (file_name, tok, strlen (tok) + 1); 
       break;
     }
+    
+    dir_lookup (cd, tok, &inode);
     dir_close (cd);
     if (inode == NULL) return NULL;
 
@@ -110,7 +108,8 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
     if (parent != NULL) *parent = inode_get_inumber (inode);
   }
 
-  palloc_free_page (dir);  
+  palloc_free_page (tmp);
+
   return cd;
 }
 
@@ -122,17 +121,18 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
 bool
 filesys_create (const char *name, off_t initial_size) 
 {
+  if (strlen (name) > MAX_CWD_LENGTH) return false;
+
   disk_sector_t inode_sector = 0;
-  char *file_name = (char *)malloc (NAME_MAX);
+  char *file_name = (char *)malloc (NAME_MAX+1);
   struct dir *dir = name_to_dir (name, file_name, NULL);
 
   if (dir == NULL) 
   {
-    dir_close (dir);
     free (file_name);
     return false;
   }
-
+  
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size, TYPE_FILE)
@@ -154,18 +154,16 @@ filesys_create (const char *name, off_t initial_size)
 void *
 filesys_open (const char *name, bool *is_dir)
 {
+  if (strcmp (name, "") == 0) return NULL;
+
   char *file_name = (char *)malloc (NAME_MAX+1);
   struct dir *dir = name_to_dir (name, file_name, NULL);
 
-  //printf ("opening name %s, fn:%s\n", name, file_name);
-
-  if (dir == NULL) 
+  if (dir == NULL || strcmp (file_name, ".") == 0 || strcmp (file_name, "..") == 0) 
   {
-    //dir_close (dir);
     free (file_name);
     return NULL;
   }
-  
 
   if (file_name[0] == 0)
   {
@@ -173,8 +171,9 @@ filesys_open (const char *name, bool *is_dir)
     return dir_open_root ();
   }
 
-
   struct inode *inode = NULL;
+
+//  printf ("root:%x,dir:%x,file:%s\n", dir_open_root(), dir, file_name); 
 
   if (dir != NULL)
     dir_lookup (dir, file_name, &inode);
@@ -241,16 +240,22 @@ filesys_chdir (const char *name)
   dir_close (dir);
   free (file_name);
 
-  if (inode==NULL) return false;
+//  printf ("type:%d\n", inode_get_type (inode));
 
-  if (inode_get_type (inode) == TYPE_DIRECTORY)
+  if (inode == NULL) 
   {
-    if (name[0] == '/') strlcpy (thread_current ()->cwd, name, strlen (name) + 1);
-    else strlcat (thread_current ()->cwd, name, strlen (name) + strlen (thread_current ()->cwd) + 1);
+    return false;
+  }
 
-    strlcat (thread_current ()->cwd, "/", strlen (thread_current ()->cwd) + 1 + 1);
+  else  if (inode_get_type (inode) == TYPE_DIRECTORY)
+  {
+    dir_close (thread_current ()->cwd);
+    thread_current ()->cwd = dir_open (inode);
+    
     return true;
   }
+
+  return false;
 }
 
 bool
@@ -272,7 +277,6 @@ filesys_mkdir (const char *name)
                   && free_map_allocate (1, &inode_sector)
                   && dir_create (inode_sector, 0)
                   && dir_add (dir, file_name, inode_sector));
-
 
   if (!success && inode_sector != 0) 
     free_map_release (inode_sector, 1);

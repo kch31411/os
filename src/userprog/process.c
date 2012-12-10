@@ -72,7 +72,7 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
   {
     palloc_free_page (fn_copy);
-  } 
+  }
 
   return tid;
 }
@@ -93,21 +93,28 @@ start_process (void *f_name)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   success = load (file_name, &if_.eip, &if_.esp);
-  
+ 
+//  printf ("loaded %d %s\n", thread_current ()->tid, f_name);
+
   thread_current ()->parent->create_success = success;
 
-  char *cwd = thread_current ()->parent->cwd;
-  strlcpy(thread_current ()->cwd, cwd, strlen(cwd) + 1);
+  char *temp = palloc_get_page(0);
+  strlcpy(temp, f_name, strlen(f_name)+1);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
 
   sema_up (&thread_current ()->parent->create_sema);
 
+//  printf ("executing %s\n", temp);
+  palloc_free_page (temp);
+
   if (!success)
   {
     syscall_exit (-1);
   }
+
+//  printf ("load success\n");
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -311,7 +318,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   if (file == NULL) 
     {
-      ASSERT(false);
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }

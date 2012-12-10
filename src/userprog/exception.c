@@ -163,7 +163,7 @@ page_fault (struct intr_frame *f)
 
   struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
   bool isLockAcquired = false;
-
+  
   if (0 > fault_addr || is_user_vaddr (fault_addr) == false || 0x08048000 > f->esp)
   {
     if (lock_held_by_current_thread (&file_lock)) lock_release (&file_lock);
@@ -174,8 +174,8 @@ page_fault (struct intr_frame *f)
   {
     if (not_present == false)
     {
+      if (lock_held_by_current_thread (&file_lock)) lock_release (&file_lock);
       syscall_exit (-1);
-      return;
     }
     void *kpage;
     bool success = false;

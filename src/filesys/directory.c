@@ -199,9 +199,7 @@ bool dir_is_empty( struct dir *dir)
         } 
     }
   return true;
-
 }
-
 
 /* Removes any entry for NAME in DIR.
    Returns true if successful, false on failure,
