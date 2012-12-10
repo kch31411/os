@@ -99,8 +99,8 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
       strlcpy (file_name, tok, strlen (tok) + 1); 
       break;
     }
-    if (inode == NULL) return NULL;
     dir_close (cd);
+    if (inode == NULL) return NULL;
 
     if (inode == NULL || inode_get_type (inode) == TYPE_FILE) return NULL;
    
@@ -241,6 +241,8 @@ filesys_chdir (const char *name)
   dir_close (dir);
   free (file_name);
 
+  if (inode==NULL) return false;
+
   if (inode_get_type (inode) == TYPE_DIRECTORY)
   {
     if (name[0] == '/') strlcpy (thread_current ()->cwd, name, strlen (name) + 1);
@@ -279,6 +281,12 @@ filesys_mkdir (const char *name)
   {
     struct inode *inode;
     dir_lookup (dir, file_name, &inode);
+    if (inode == NULL)
+    {
+      dir_close(dir);
+      free(file_name);
+      return false;
+    }
     struct dir *new = dir_open (inode);
     
     dir_add (new, ".", inode_sector);

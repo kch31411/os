@@ -235,7 +235,6 @@ dir_remove (struct dir *dir, const char *name)
       goto done;
     }
     dir_close(dir);
-
   }
 
   /* Erase directory entry. */
