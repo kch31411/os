@@ -395,8 +395,9 @@ thread_exit (void)
 #ifdef USERPROG
   process_exit ();
 #endif
+  
 
-  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+  if (lock_held_by_current_thread (&file_lock) ) lock_release (&file_lock);
 
   sema_up (&cur->end_sema);
 

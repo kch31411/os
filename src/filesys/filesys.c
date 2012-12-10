@@ -93,11 +93,13 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
     struct inode *inode = NULL;
 
     dir_lookup (cd, tok, &inode);
+//    printf("filename : %s\n", tok);
     if (*save_ptr == NULL) 
     {
       strlcpy (file_name, tok, strlen (tok) + 1); 
       break;
     }
+    if (inode == NULL) return NULL;
     dir_close (cd);
 
     if (inode == NULL || inode_get_type (inode) == TYPE_FILE) return NULL;
@@ -159,9 +161,9 @@ filesys_open (const char *name, bool *is_dir)
 
   if (dir == NULL) 
   {
-    dir_close (dir);
+    //dir_close (dir);
     free (file_name);
-    return false;
+    return NULL;
   }
   
 
@@ -171,25 +173,6 @@ filesys_open (const char *name, bool *is_dir)
     return dir_open_root ();
   }
 
-  /*
-  if (file_name[0] == 'b')
-  {
-    char *temp = malloc (NAME_MAX+1);
-    int x;
-
-    x = filesys_readdir (dir, temp);
-    printf ("%d readdir: %s\n", x, temp); 
-    x = filesys_readdir (dir, temp);
-    printf ("%d readdir: %s\n", x, temp); 
-    x = filesys_readdir (dir, temp);
-    printf ("%d readdir: %s\n", x, temp); 
-    x = filesys_readdir (dir, temp);
-    printf ("%d readdir: %s\n", x, temp); 
-    x = filesys_readdir (dir, temp);
-    printf ("%d readdir: %s\n", x, temp);
-
-    free (temp);
-  }*/
 
   struct inode *inode = NULL;
 
@@ -197,6 +180,8 @@ filesys_open (const char *name, bool *is_dir)
     dir_lookup (dir, file_name, &inode);
   dir_close (dir);
   free (file_name);
+
+  if (inode == NULL) return NULL;
 
   if (inode_get_type (inode) == TYPE_FILE) 
   {

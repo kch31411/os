@@ -98,10 +98,15 @@ bool syscall_create (const char *file, unsigned int initial_size)
     syscall_exit (-1);
   }
 
-  lock_acquire (&file_lock);
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired = true;
+  }
   bool ret = filesys_create(file, initial_size);
-  lock_release (&file_lock);
-  
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+ 
   return ret;
 }
 
@@ -111,11 +116,16 @@ bool syscall_remove (const char *file)
   {
     syscall_exit (-1);
   }
-
-  lock_acquire (&file_lock);
+  
+  bool isLockAcquired = false;
+  if (lock_held_by_current_thread (&file_lock) == false)
+  {
+    lock_acquire (&file_lock);
+    isLockAcquired =true;
+  }
   bool ret = filesys_remove (file);
-  lock_release (&file_lock);
- 
+  if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
+
   return ret;
 }
 
