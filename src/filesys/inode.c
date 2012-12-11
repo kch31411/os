@@ -208,6 +208,8 @@ inode_reopen (struct inode *inode)
 
   if (isLockAcquired == true) lock_release (&file_lock);
 
+  if (inode->removed) return NULL;
+
   return inode;
 }
 

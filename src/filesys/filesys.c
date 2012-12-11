@@ -132,7 +132,7 @@ filesys_create (const char *name, off_t initial_size)
     free (file_name);
     return false;
   }
-  
+   
   bool success = (dir != NULL
                   && free_map_allocate (1, &inode_sector)
                   && inode_create (inode_sector, initial_size, TYPE_FILE)
