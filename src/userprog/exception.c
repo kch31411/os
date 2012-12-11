@@ -161,7 +161,11 @@ page_fault (struct intr_frame *f)
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
 
-  if ( is_kernel_vaddr(f->esp) ) f->esp = thread_current()->esp;
+  if ( is_kernel_vaddr(f->esp) || f->esp == 1 )   // for test page-merge-stk  why esp == 1:???????????????????????????
+  { 
+//    printf("f->esp:%x, t->esp:%x\n", f->esp, thread_current()->esp); 
+    f->esp = thread_current()->esp;
+  }
 
   struct page *p = page_lookup (thread_current (), pg_round_down (fault_addr));
   bool isLockAcquired = false;
