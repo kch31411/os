@@ -234,6 +234,7 @@ int syscall_open (const char *file)
 
   if (open_file == NULL)
   {
+    //printf("open file is null\n");
     if (lock_held_by_current_thread (&file_lock) && isLockAcquired == true) lock_release (&file_lock);
     return -1;
   }

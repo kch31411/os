@@ -85,6 +85,7 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
 
   char *save_ptr = NULL;
   char *tok = strtok_r (tmp, "/", &save_ptr);
+  if (parent != NULL) *parent = inode_get_inumber( dir_get_inode(cd));
 
   while (1)
   {
@@ -98,9 +99,13 @@ name_to_dir (const char *name, char *file_name, disk_sector_t *parent)
     
     dir_lookup (cd, tok, &inode);
     dir_close (cd);
-    if (inode == NULL) return NULL;
 
-    if (inode == NULL || inode_get_type (inode) == TYPE_FILE) return NULL;
+    if (inode == NULL || inode_get_type (inode) == TYPE_FILE)
+    {
+      palloc_free_page(tmp);
+      return NULL;
+    }
+
    
     cd = dir_open (inode);
 
@@ -159,7 +164,8 @@ filesys_open (const char *name, bool *is_dir)
   char *file_name = (char *)malloc (NAME_MAX+1);
   struct dir *dir = name_to_dir (name, file_name, NULL);
 
-  if (dir == NULL || strcmp (file_name, ".") == 0 || strcmp (file_name, "..") == 0) 
+  //if (dir == NULL || strcmp (file_name, ".") == 0 || strcmp (file_name, "..") == 0) 
+  if (dir == NULL ) 
   {
     free (file_name);
     return NULL;
@@ -244,6 +250,7 @@ filesys_chdir (const char *name)
 
   if (inode == NULL) 
   {
+    
     return false;
   }
 
@@ -293,8 +300,10 @@ filesys_mkdir (const char *name)
     }
     struct dir *new = dir_open (inode);
     
+    //printf("mkdir %s\n", name);
     dir_add (new, ".", inode_sector);
     dir_add (new, "..", parent);
+    dir_close(new);
   }
 
   dir_close (dir);

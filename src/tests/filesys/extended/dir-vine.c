@@ -52,6 +52,7 @@ test_main (void)
         }
 
       /* Check for file and directory. */
+      //printf("%d\n", i);
       CHECK ((fd = open (".")) > 1, "open \".\"");
       CHECK (readdir (fd, name[0]), "readdir \".\"");
       CHECK (readdir (fd, name[1]), "readdir \".\"");
@@ -75,7 +76,6 @@ test_main (void)
     {
       char file_name[16], dir_name[16];
 
-      printf ("level %d\n", i);
       snprintf (file_name, sizeof file_name, "file%d", i);
       snprintf (dir_name, sizeof dir_name, "dir%d", i);
       CHECK (chdir (".."), "chdir \"..\"");
