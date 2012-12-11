@@ -127,6 +127,7 @@ struct thread
     struct list empty_mmap_list;
 
     struct dir *cwd;
+    void *esp;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

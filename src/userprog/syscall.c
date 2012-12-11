@@ -575,6 +575,7 @@ int syscall_inumber (int fd)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+  thread_current()->esp = f->esp;
   int syscall_num = arg_get(ARG(0));
 
   switch (syscall_num)
